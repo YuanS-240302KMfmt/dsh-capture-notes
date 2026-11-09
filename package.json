@@ -1,0 +1,44 @@
+{
+  "name": "dsh-capture-notes",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Windows capture studio for DSH: live subtitles, screen recording, file transcription and notes.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "test": "node tests/e2e.mjs"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/asr-worker.js",
+    "lib/window.ps1",
+    "lib/core/media.js",
+    "lib/core/subtitle.js",
+    "lib/core/pipeline.js",
+    "lib/NAudio.dll",
+    "lib/NAudio.LICENSE.txt",
+    "scripts/cli.mjs",
+    "scripts/install-skill.ps1",
+    "scripts/verify-install.mjs",
+    "scripts/doctor.mjs",
+    "skill/SKILL.md",
+    "skill/references/notes-template.md",
+    "locale/*.json",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "DESIGN.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

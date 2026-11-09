@@ -1,0 +1,17 @@
+# Runtime payload (copied in P5, never committed)
+models/
+runtime/
+runtime-data/
+
+# User products
+sessions/
+work/
+out/
+
+# Local scratch
+node_modules/
+p0/.tmp/
+tests/.tmp-*/
+*.log
+Thumbs.db
+.DS_Store

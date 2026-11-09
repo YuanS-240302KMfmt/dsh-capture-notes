@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Capture Notes">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1f2430"/>
+  <rect x="14" y="16" width="36" height="24" rx="5" fill="#2f3646" stroke="#5b6b8c" stroke-width="2"/>
+  <circle cx="32" cy="28" r="6" fill="#e5484d"/>
+  <rect x="18" y="46" width="28" height="3" rx="1.5" fill="#8ea2c6"/>
+  <rect x="24" y="52" width="16" height="3" rx="1.5" fill="#5b6b8c"/>
+</svg>

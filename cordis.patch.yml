@@ -1,0 +1,5 @@
+# Insert the capture-notes Host plugin into the desktop profile.
+# Not applied yet: the profile is wired in P1/P5, after lib/index.js has a real entry.
+- insert:
+    - id: capture-notes
+      name: dsh-capture-notes
