@@ -3,6 +3,13 @@
   "version": "0.6.0",
   "private": true,
   "description": "Windows capture studio for DSH: live subtitles, screen recording, file transcription and notes.",
+  "license": "Apache-2.0",
+  "author": "YuanS-240302KMfmt",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YuanS-240302KMfmt/dsh-capture-notes.git"
+  },
+  "homepage": "https://github.com/YuanS-240302KMfmt/dsh-capture-notes",
   "type": "module",
   "main": "./lib/index.js",
   "scripts": {
@@ -34,7 +41,11 @@
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
-    "DESIGN.md"
+    "DESIGN.md",
+    "docs/",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "dsh": {
     "bundle": {

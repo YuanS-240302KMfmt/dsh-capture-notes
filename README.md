@@ -204,6 +204,12 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -
 - **托盘**：尚未实现；关闭窗口会先收尾。
 - **沙箱**：窗口数据默认在模块 `runtime-data\`（避开 `%LOCALAPPDATA%` 的写入限制）；可用 `windowDataDir` 改到别处。
 
+## License
+
+本项目采用 **Apache License 2.0**。完整文本见 [`LICENSE`](LICENSE)，版权与第三方组件声明见 [`NOTICE`](NOTICE)、[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+
+`models/` 与 `runtime/` 不随仓库分发；如果重新打包包含 ffmpeg/ffprobe 或模型文件，请保留并遵守其上游许可（ffmpeg/ffprobe 为 LGPL-2.1）。
+
 ## 边界
 
 - 不改动 `live-translate` 与 `.video-notes`。
