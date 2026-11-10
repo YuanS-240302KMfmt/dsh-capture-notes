@@ -184,6 +184,27 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\post.png -PreviewMode record
 pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -DataDir p0\.tmp\window-data
 ```
 
+## 重新打开窗口
+
+托盘「退出」会结束小窗进程。想继续使用有两种方式：
+
+1. **重启 DSH**：Host 会按 `openOnStart` 自动拉起窗口。
+2. **不重启 DSH**，在普通 PowerShell 里执行：
+
+```powershell
+pwsh -NoProfile -File scripts\open-window.ps1
+```
+
+脚本会自动使用模块的 `runtime-data` 和自带 ffmpeg，避免手动启动时漏传 `-FfmpegPath`。
+
+可选传入 DSH 父进程，让 DSH 退出时窗口一并关闭：
+
+```powershell
+pwsh -NoProfile -File scripts\open-window.ps1 -ParentPid <DSH主进程PID>
+```
+
+不传 `ParentPid` 时，窗口会一直保留，直到你在托盘里退出。
+
 ## 配置
 
 | 项 | 默认 | 说明 |
