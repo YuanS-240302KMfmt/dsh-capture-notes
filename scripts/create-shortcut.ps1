@@ -5,8 +5,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $module = Split-Path $PSScriptRoot -Parent
 $pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
-$arguments = '-NoProfile -WindowStyle Minimized -ExecutionPolicy Bypass -File "' +
-  (Join-Path $module 'scripts\open-window.ps1') + '"'
+$wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
+$arguments = '"' + (Join-Path $module 'scripts\launch-window.vbs') + '"'
 
 $folders = @()
 if ($StartMenu) {
@@ -22,7 +22,7 @@ foreach ($folder in $folders) {
   New-Item -ItemType Directory -Force -Path $folder | Out-Null
   $file = Join-Path $folder '录屏字幕台.lnk'
   $shortcut = $shell.CreateShortcut($file)
-  $shortcut.TargetPath = $pwsh
+  $shortcut.TargetPath = $wscript
   $shortcut.Arguments = $arguments
   $shortcut.WorkingDirectory = $module
   $shortcut.IconLocation = "$pwsh,0"
@@ -34,6 +34,6 @@ foreach ($folder in $folders) {
 [pscustomobject]@{
   ok = $true
   shortcuts = $files
-  target = $pwsh
+  target = $wscript
   arguments = $arguments
 } | ConvertTo-Json -Depth 4

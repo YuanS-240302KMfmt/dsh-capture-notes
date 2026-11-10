@@ -198,7 +198,7 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -
 pwsh -NoProfile -File scripts\open-window.ps1
 ```
 
-快捷方式/`.cmd` 内部都会调用 `scripts\open-window.ps1`，自动使用模块的 `runtime-data` 和自带 ffmpeg，避免手动启动时漏传 `-FfmpegPath`。
+快捷方式/`.cmd` 内部都会调用 `scripts\launch-window.vbs`，再由它隐藏启动 `open-window.ps1`，不会出现空白终端窗口；窗口本身使用模块的 `runtime-data` 和自带 ffmpeg，避免手动启动时漏传 `-FfmpegPath`。
 
 需要重新生成快捷方式时：
 
