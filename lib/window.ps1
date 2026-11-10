@@ -21,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($DataDir)) {
   $DataDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'runtime-data'
 }
 $script:dataDir = $DataDir
+$script:moduleRoot = Split-Path $PSScriptRoot -Parent
 $script:nativeDir = Join-Path $DataDir 'native'
 $script:chunksDir = Join-Path $script:nativeDir 'chunks'
 $script:audioDir = Join-Path $script:nativeDir 'audio'
@@ -58,6 +59,10 @@ $script:ffmpegProc = $null
 $script:activeSessionId = ''
 $script:captureStartedAt = Get-Date
 $script:localWarning = ''
+$script:trayEnabled = ($AutoCloseMs -le 0) -and [string]::IsNullOrWhiteSpace($PreviewPath) -and (-not $Diagnose)
+$script:allowClose = $false
+$script:exitAfterStop = $false
+$script:tray = $null
 $script:postWaiting = $false
 $script:postPromptedFor = ''
 $script:lastSessionId = ''
@@ -187,17 +192,56 @@ function Format-Stamp([double]$seconds) {
 function Set-Status([string]$text, [string]$color = '#8FA6C8') {
   $script:statusText.Text = $text
   $script:statusDot.Fill = New-Brush $color
+  if ($null -ne $script:tray) {
+    $label = '录屏字幕台 · ' + $text
+    if ($label.Length -gt 63) { $label = $label.Substring(0, 63) }
+    try { $script:tray.Text = $label } catch {}
+  }
+}
+
+function Show-CaptureWindow {
+  try {
+    $script:window.Show()
+    if ($script:window.WindowState -eq 'Minimized') { $script:window.WindowState = 'Normal' }
+    $script:window.Activate()
+  } catch {}
+}
+
+function Hide-CaptureWindow {
+  try { $script:window.Hide() } catch {}
+}
+
+function Exit-CaptureNotes {
+  if ($script:capturing) {
+    Stop-Session
+    $script:exitAfterStop = $true
+    Hide-CaptureWindow
+    return
+  }
+  $script:allowClose = $true
+  if ($null -ne $script:tray) {
+    try { $script:tray.Visible = $false; $script:tray.Dispose() } catch {}
+    $script:tray = $null
+  }
+  try { $script:window.Close() } catch {}
 }
 
 function Show-Error([string]$text) {
   if ([string]::IsNullOrWhiteSpace($text)) { Clear-Error; return }
   $script:errorText.Text = $text
   $script:errorBar.Visibility = 'Visible'
+  if ($null -ne $script:micSettingsButton) {
+    $isMicError = $text -match '麦克风|waveInOpen|E_ACCESSDENIED|音频设备'
+    $script:micSettingsButton.Visibility = $(if ($isMicError) { 'Visible' } else { 'Collapsed' })
+  }
 }
 
 function Clear-Error {
   $script:errorBar.Visibility = 'Collapsed'
   $script:errorText.Text = ''
+  if ($null -ne $script:micSettingsButton) {
+    $script:micSettingsButton.Visibility = 'Collapsed'
+  }
 }
 
 function Set-CapturingUi([bool]$on) {
@@ -752,6 +796,7 @@ $xaml = @'
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button x:Name="FileButton" Content="选择文件" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="选择本地视频或音频"/>
           <Button x:Name="SubtitleButton" Content="软字幕" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="字幕形态"/>
+          <Button x:Name="RecentButton" Content="最近" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="最近会话"/>
           <Button x:Name="MonitorButton" Content="显示器 1" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="录制哪个显示器"/>
           <Button x:Name="SourceButton" Content="自动" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" ToolTip="源语言"/>
           <Button x:Name="TargetButton" Content="简体中文" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" ToolTip="目标语言"/>
@@ -790,7 +835,14 @@ $xaml = @'
       </Grid>
 
       <Border x:Name="ErrorBar" Grid.Row="6" Background="#3A1D22" Padding="16,6" Visibility="Collapsed">
-        <TextBlock x:Name="ErrorText" Foreground="#FF9AA2" FontSize="11" TextWrapping="Wrap"/>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="ErrorText" Foreground="#FF9AA2" FontSize="11" TextWrapping="Wrap"/>
+          <Button x:Name="MicSettingsButton" Grid.Column="1" Content="打开麦克风设置" Background="#4A2630" Foreground="#FFD1D6" BorderThickness="0" Padding="8,2" Margin="8,0,0,0" FontSize="11" Cursor="Hand" Visibility="Collapsed"/>
+        </Grid>
       </Border>
     </Grid>
   </Border>
@@ -819,10 +871,12 @@ $script:statusText = $window.FindName('StatusText')
 $script:elapsedText = $window.FindName('ElapsedText')
 $script:errorBar = $window.FindName('ErrorBar')
 $script:errorText = $window.FindName('ErrorText')
+$script:micSettingsButton = $window.FindName('MicSettingsButton')
 $script:modeHint = $window.FindName('ModeHint')
 $script:monitorButton = $window.FindName('MonitorButton')
 $script:fileButton = $window.FindName('FileButton')
 $script:subtitleButton = $window.FindName('SubtitleButton')
+$script:recentButton = $window.FindName('RecentButton')
 $script:fileOpen = $window.FindName('FileOpen')
 $script:postPanel = $window.FindName('PostPanel')
 $script:postTitle = $window.FindName('PostTitle')
@@ -834,6 +888,28 @@ $script:postSrt = $window.FindName('PostSrt')
 $script:postNone = $window.FindName('PostNone')
 $script:postProgress = $window.FindName('PostProgress')
 $script:postOpen = $window.FindName('PostOpen')
+
+if ($script:trayEnabled) {
+  try {
+    $tray = New-Object System.Windows.Forms.NotifyIcon
+    $tray.Icon = [System.Drawing.SystemIcons]::Application
+    $tray.Text = '录屏字幕台'
+    $tray.Visible = $true
+    $menu = New-Object System.Windows.Forms.ContextMenuStrip
+    $showItem = New-Object System.Windows.Forms.ToolStripMenuItem('显示窗口')
+    $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem('退出')
+    $showItem.Add_Click({ Show-CaptureWindow })
+    $exitItem.Add_Click({ Exit-CaptureNotes })
+    [void]$menu.Items.Add($showItem)
+    [void]$menu.Items.Add($exitItem)
+    $tray.ContextMenuStrip = $menu
+    $tray.add_DoubleClick({ Show-CaptureWindow })
+    $script:tray = $tray
+  } catch {
+    $script:tray = $null
+    Show-Error ("托盘初始化失败：" + $_.Exception.Message)
+  }
+}
 
 $script:monitors = @()
 $script:monitorLabels = @()
@@ -884,6 +960,80 @@ function Set-FileUi([bool]$on) {
   $script:tabRecord.IsEnabled = -not $on
 }
 
+function Get-TranslationState([string]$dir) {
+  if ([string]::IsNullOrWhiteSpace($dir) -or -not (Test-Path -LiteralPath $dir)) { return '未生成' }
+  try {
+    $manifest = Get-Content -LiteralPath (Join-Path $dir 'session.json') -Raw | ConvertFrom-Json
+    $applied = @($manifest.artifacts.translations | Where-Object { $_.state -eq 'applied' }).Count
+    if ($applied -gt 0) { return '已应用' }
+  } catch {}
+  $files = @(Get-ChildItem -LiteralPath $dir -File -Filter 'translation.*.json' -ErrorAction SilentlyContinue)
+  if ($files.Count -gt 0) { return '已生成' }
+  return '未生成'
+}
+
+function Get-RecentSessions {
+  $items = @()
+  foreach ($root in @((Join-Path $script:moduleRoot 'sessions'), (Join-Path $script:moduleRoot 'out'))) {
+    if (-not (Test-Path -LiteralPath $root)) { continue }
+    foreach ($dir in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue) {
+      $manifestPath = Join-Path $dir.FullName 'session.json'
+      if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
+      try { $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json } catch { continue }
+      $modeLabel = switch ([string]$manifest.mode) { 'live' { '实时' } 'record' { '录屏' } 'file' { '文件' } default { [string]$manifest.mode } }
+      $name = $dir.Name
+      if ($name.Length -gt 42) { $name = $name.Substring(0, 42) + '…' }
+      $items += [pscustomobject]@{
+        Path = $dir.FullName
+        Mode = [string]$manifest.mode
+        Id = [string]$manifest.id
+        Label = ('{0} · {1} · {2}' -f $modeLabel, $dir.LastWriteTime.ToString('MM-dd HH:mm'), $name)
+        Time = $dir.LastWriteTime
+      }
+    }
+  }
+  return @($items | Sort-Object Time -Descending | Select-Object -First 10)
+}
+
+function Show-RecentMenu {
+  $items = @(Get-RecentSessions)
+  $menu = New-Object System.Windows.Forms.ContextMenuStrip
+  if ($items.Count -eq 0) {
+    $empty = New-Object System.Windows.Forms.ToolStripMenuItem('暂无会话')
+    $empty.Enabled = $false
+    [void]$menu.Items.Add($empty)
+  } else {
+    foreach ($item in $items) {
+      $entry = New-Object System.Windows.Forms.ToolStripMenuItem($item.Label)
+      $entry.Tag = $item
+      $entry.Add_Click({
+        param($sender, $eventArgs)
+        try { Start-Process explorer.exe -ArgumentList ('"' + [string]$sender.Tag.Path + '"') } catch {}
+      })
+      if ($item.Mode -eq 'record') {
+        foreach ($mode in @(
+          @{ Label = '重跑软字幕'; Value = 'soft' },
+          @{ Label = '重跑硬字幕'; Value = 'burn' },
+          @{ Label = '仅字幕文件'; Value = 'srt' }
+        )) {
+          $child = New-Object System.Windows.Forms.ToolStripMenuItem($mode.Label)
+          $child.Tag = [pscustomobject]@{ Id = $item.Id; Mode = $mode.Value }
+          $child.Add_Click({
+            param($sender, $eventArgs)
+            $tag = $sender.Tag
+            $request = [pscustomobject]@{ sessionId = $tag.Id; mode = $tag.Mode }
+            Write-JsonFile $script:postRequestFile $request
+            Set-Status '已请求后处理…' '#F2C94C'
+          })
+          [void]$entry.DropDownItems.Add($child)
+        }
+      }
+      [void]$menu.Items.Add($entry)
+    }
+  }
+  $menu.Show($script:recentButton, 0, $script:recentButton.ActualHeight)
+}
+
 function Format-FileName([string]$name) {
   if ($name.Length -le 22) { return $name }
   return $name.Substring(0, 20) + '…'
@@ -917,6 +1067,7 @@ function Switch-Mode([string]$mode) {
   $script:monitorButton.Visibility = $(if ($recordActive) { 'Visible' } else { 'Collapsed' })
   $script:fileButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
   $script:subtitleButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
+  $script:recentButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
   $script:systemCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
   $script:micCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
   $script:fileOpen.Visibility = 'Collapsed'
@@ -1004,7 +1155,10 @@ function Update-FileState {
   if ($state.status -eq 'done') {
     $script:fileOutDir = [string]$state.outDir
     Set-FileUi $false
-    Set-Status ('完成 · ' + [System.IO.Path]::GetFileName($script:fileOutDir)) '#6FCF97'
+    $translationState = Get-TranslationState $script:fileOutDir
+    $kind = [string]$state.result.mediaKind
+    $kindText = $(if ($kind -eq 'audio') { ' · 音频（无视频）' } else { '' })
+    Set-Status ('完成 · ' + [System.IO.Path]::GetFileName($script:fileOutDir) + $kindText + ' · 译文' + $translationState) '#6FCF97'
     $script:fileOpen.Visibility = 'Visible'
     $script:fileOpen.Tag = $script:fileOutDir
   } elseif ($state.status -eq 'cancelled') {
@@ -1072,6 +1226,7 @@ $script:tabLive.Add_Click({ Switch-Mode 'live' })
 $script:tabRecord.Add_Click({ Switch-Mode 'record' })
 $script:tabFile.Add_Click({ Switch-Mode 'file' })
 $script:fileButton.Add_Click({ Select-File })
+$script:recentButton.Add_Click({ Show-RecentMenu })
 $script:subtitleButton.Add_Click({
   $script:fileSubtitleIndex = ($script:fileSubtitleIndex + 1) % $script:fileSubtitleModes.Count
   $script:subtitleButton.Content = $script:fileSubtitleLabels[$script:fileSubtitleIndex]
@@ -1112,7 +1267,13 @@ $script:closeButton.Add_Click({
     $script:closeAfterStop = $true
     return
   }
-  $script:window.Close()
+  if ($script:trayEnabled) { Hide-CaptureWindow } else { Exit-CaptureNotes }
+})
+
+$script:micSettingsButton.Add_Click({
+  try { Start-Process 'ms-settings:privacy-microphone' } catch {
+    Show-Error ("无法打开 Windows 麦克风设置：" + $_.Exception.Message)
+  }
 })
 
 $script:sourceButton.Add_Click({
@@ -1179,14 +1340,22 @@ $script:heartbeatTimer.Add_Tick({
   }
   if (Test-Path -LiteralPath $script:quitFile) {
     try { Remove-Item -LiteralPath $script:quitFile -Force } catch {}
-    try { $script:window.Close() } catch {}
+    Exit-CaptureNotes
   }
-  if ($script:closeAfterStop) {
+  if (($script:closeAfterStop -or $script:exitAfterStop)) {
     $snapshot = $null
     try { $snapshot = Get-Content -LiteralPath $script:liveFile -Raw | ConvertFrom-Json } catch {}
     if ($null -eq $snapshot -or $snapshot.status -eq 'stopped' -or $snapshot.status -eq 'error') {
       $script:closeAfterStop = $false
-      try { $script:window.Close() } catch {}
+      if ($script:exitAfterStop) {
+        $script:exitAfterStop = $false
+        Exit-CaptureNotes
+      } elseif ($script:trayEnabled) {
+        Hide-CaptureWindow
+      } else {
+        $script:allowClose = $true
+        try { $script:window.Close() } catch {}
+      }
     }
   }
 })
@@ -1198,21 +1367,62 @@ if ($ParentPid -gt 0) {
   $script:parentTimer.Add_Tick({
     if ($null -eq (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) {
       if ($script:capturing) { Stop-Session }
+      $script:allowClose = $true
+      if ($null -ne $script:tray) {
+        try { $script:tray.Visible = $false; $script:tray.Dispose() } catch {}
+        $script:tray = $null
+      }
       try { $script:window.Close() } catch {}
     }
   })
   $script:parentTimer.Start()
 }
 
+$window.Add_SourceInitialized({
+  try {
+    $helper = [System.Windows.Interop.WindowInteropHelper]::new($script:window)
+    $source = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
+    $source.AddHook({
+      param($hwnd, $msg, $wParam, $lParam, [ref]$handled)
+      if ($msg -eq 0x0010 -and $script:trayEnabled -and -not $script:allowClose) {
+        $handled.Value = $true
+        Hide-CaptureWindow
+      }
+      return [IntPtr]::Zero
+    })
+  } catch {}
+})
+
+$window.Add_Closed({
+  try { [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown() } catch {}
+})
+
 $window.Add_Closing({
+  param($sender, $eventArgs)
+  if ($script:trayEnabled -and -not $script:allowClose) {
+    $eventArgs.Cancel = $true
+    Hide-CaptureWindow
+    return
+  }
   if ($script:capturing) { Stop-Session }
+  if ($null -ne $script:tray) {
+    try { $script:tray.Visible = $false; $script:tray.Dispose() } catch {}
+    $script:tray = $null
+  }
   try { Remove-Item -LiteralPath $script:pidFile -Force -ErrorAction SilentlyContinue } catch {}
 })
 
 if ($AutoCloseMs -gt 0) {
   $script:autoTimer = [System.Windows.Threading.DispatcherTimer]::new()
   $script:autoTimer.Interval = [TimeSpan]::FromMilliseconds($AutoCloseMs)
-  $script:autoTimer.Add_Tick({ try { $script:window.Close() } catch {} })
+  $script:autoTimer.Add_Tick({
+    $script:allowClose = $true
+    if ($null -ne $script:tray) {
+      try { $script:tray.Visible = $false; $script:tray.Dispose() } catch {}
+      $script:tray = $null
+    }
+    try { $script:window.Close() } catch {}
+  })
   $script:autoTimer.Start()
 }
 
@@ -1312,4 +1522,13 @@ if ($env:CAPTURE_NOTES_AUTOSTART -eq '1') {
   $script:autoStartTimer.Start()
 }
 
-$window.ShowDialog() | Out-Null
+if (-not [string]::IsNullOrWhiteSpace($PreviewPath)) {
+  $window.ShowDialog() | Out-Null
+} else {
+  $window.Show()
+  [System.Windows.Threading.Dispatcher]::Run()
+}
+if ($null -ne $script:tray) {
+  try { $script:tray.Visible = $false; $script:tray.Dispose() } catch {}
+  $script:tray = $null
+}

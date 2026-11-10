@@ -21,6 +21,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | **P3 文件链路** | ✅ 抽音/识别/逐字稿、软/硬字幕成片、只抽字幕、CLI、agent 译文应用、窗口文件 tab |
 | **P4 技能与纪要** | ✅ 全局技能已安装、纪要/译文/文件三条工作流、演示会话产物 |
 | **P5 打包与独立性** | ✅ 本地安装自带模型/运行时、profile 接入、`selfContained` 与空参考目录验证；GitHub clone 不含这两块（见「从源码运行」） |
+| **0.7.0 稳定性/格式/托盘** | 🚧 长文件、格式边界、取消、托盘、最近会话、译文状态已实现；待人工验收 |
 
 测试（全部通过）：
 
@@ -36,6 +37,10 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | `node tests/file-window-e2e.mjs` | 真实小窗发起文件任务并显示进度 |
 | `VIDEO_NOTES_HOME=<空目录> node tests\file-e2e.mjs` | 不依赖 `.video-notes` 的独立性验证 |
 | `pwsh -File tests\window-stale-snapshot.ps1` | 旧 `stopped` 快照不再误停新采集；同会话真停止仍生效 |
+| `node tests/formats-e2e.mjs` | 纯音频、无音轨、MKV、内嵌字幕 |
+| `node tests/cancel-e2e.mjs` | 取消 ASR / mux / burn，无半成品 |
+| `pwsh -File tests/tray-e2e.ps1` | 关闭到托盘、quit 退出 |
+| 真实 88 分钟文件（手工） | 814 段、174 s、峰值 591 MB、成片 10.9 GB |
 | 本地 `sessions\p4-demo\`（手工演示，不提交） | 技能：纪要、英文译文、双语字幕成片、简繁兜底 |
 
 ## 从源码运行（Git clone）
@@ -152,6 +157,7 @@ pwsh -File scripts\install-skill.ps1
 - 升级模块后无需改 profile；重跑 doctor 与测试即可。
 - 重启验收清单：[`docs/capture-notes-restart-verification.md`](docs/capture-notes-restart-verification.md)（preflight / after 检查、手动验收、失败处理、回滚）。
 - 本次重启结果：[`docs/capture-notes-restart-report.md`](docs/capture-notes-restart-report.md)（Host 实时/文件/录屏+后处理、双音轨、文件三形态与译文烧录已通过）。
+- 0.7.0 需求：[`docs/capture-notes-v0.7.0-requirements.md`](docs/capture-notes-v0.7.0-requirements.md)；实施记录：[`docs/capture-notes-v0.7.0-report.md`](docs/capture-notes-v0.7.0-report.md)。
 - `models\`、`runtime\` 已在 `.gitignore`；npm `files` 不包含它们，当前是本地 link 安装，不是 npm 发布包。
 
 ## 运行与自检
@@ -189,7 +195,7 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -
 | `idleStopMs` | 180000 | 无音频自动停止 |
 | `nativeWindow` / `openOnStart` | true | 是否开独立小窗 |
 
-## 已知限制（P3/P4/P5）
+## 已知限制（P3/P4/P5/0.7）
 
 - **profile 生效**：已写入 desktop profile 并完成 pnpm link，但需要重启 DSH 才会加载插件；首次启动会自动打开小窗。
 - **发布形态**：`models\` 与 `runtime\` 在 `.gitignore` 中，npm `files` 也不包含；当前是本地 `link:` 安装，不是可直接分发的 npm 包。
@@ -197,11 +203,12 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -
 - **技能安装**：需要写 `~\.dsh\skills`；其它已打开的 DSH 会话可能需要重启才会加载新技能。
 - **P4 演示**：本地 `sessions\p4-demo` 是合成会话（90 秒 testsrc + 手写逐字稿），用于验证技能流程，不是真实会议；它不提交到仓库。
 - **麦克风**：需在 Windows 隐私设置中允许桌面应用访问麦克风；本机已于 2026-11-10 实测系统+麦克风双音轨通过。
-- **长媒体**：文件流水线用 8–20 秒合成素材验证；1 小时视频未压测。
-- **取消**：文件任务取消会终止识别 worker 与抽音 ffmpeg；封装/烧录阶段的取消是尽力而为。
-- **译文**：模块不内置文件翻译，必须由 agent 写 `translation.<target>.json`；id 缺失/多余/重复会拒绝。
+- **长媒体**：文件流水线已实测 88 分钟、814 段、成片 10.9 GB；60 分钟长**录屏**仍未压测（0.8.0）。
+- **取消**：文件任务在 ASR/mux/burn 阶段均已实测可取消；取消时清理最终半成品，临时目录可能保留供排查。
+- **译文**：模块不内置文件翻译，必须由 agent 写 `translation.<target>.json`；id 缺失/多余/重复会拒绝。文件 tab 只显示译文状态。
 - **硬字幕**：重编码耗时约 6–12 分钟/小时，画质有一次损失。
-- **托盘**：尚未实现；关闭窗口会先收尾。
+- **托盘**：0.7.0 已实现关闭到托盘、显示/退出菜单；托盘菜单的人工点击验收待补。
+- **多显示器**：当前只有单屏环境，未做多屏/负坐标/DPI 适配验收。
 - **沙箱**：窗口数据默认在模块 `runtime-data\`（避开 `%LOCALAPPDATA%` 的写入限制）；可用 `windowDataDir` 改到别处。
 
 ## License
