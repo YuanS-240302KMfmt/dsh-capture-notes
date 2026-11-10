@@ -45,6 +45,15 @@ const generated = spawnSync(ffmpeg, [
 assert.equal(generated.status, 0, 'could not generate the test part')
 assert.ok(fs.statSync(part).size > 10_000, 'test part is too small')
 
+// A truncated tail part is what a hard kill usually leaves behind. Recovery
+// must validate it with ffmpeg and drop it instead of muxing corrupt video.
+const badPart = path.join(dataDir, 'native', 'video', 'part-001.ts')
+const bytes = fs.readFileSync(part)
+fs.writeFileSync(badPart, bytes.subarray(0, 5000))
+const old = new Date(Date.now() - 60_000)
+fs.utimesSync(part, old, old)
+fs.utimesSync(badPart, old, old)
+
 fs.copyFileSync(SPEECH, path.join(dataDir, 'native', 'audio', 'system.wav'))
 fs.writeFileSync(path.join(dataDir, 'native', 'record.json'), JSON.stringify({
   audioStartedAt: new Date().toISOString(),
@@ -52,8 +61,8 @@ fs.writeFileSync(path.join(dataDir, 'native', 'record.json'), JSON.stringify({
 }), 'utf8')
 
 // Make the part look like it came from a crashed session, not one still writing.
-const old = new Date(Date.now() - 60_000)
 fs.utimesSync(part, old, old)
+fs.utimesSync(badPart, old, old)
 
 const disposers = []
 const ctx = {
@@ -112,6 +121,19 @@ try {
   assert.equal(info.videoStreams.length, 1)
   assert.ok(info.audioStreams.length >= 1, 'recovered video has no audio')
   assert.ok(info.duration >= 2, 'recovered video is too short')
+  assert.equal(fs.existsSync(badPart), false, 'corrupt tail part was not dropped')
+
+  const decodeLog = path.join(TMP, 'decode.log')
+  const decodeFd = fs.openSync(decodeLog, 'w')
+  const decoded = spawnSync(ffmpeg, ['-hide_banner', '-v', 'error', '-i', video, '-f', 'null', '-'], {
+    stdio: ['ignore', 'ignore', decodeFd],
+    windowsHide: true,
+    timeout: 120_000,
+  })
+  fs.closeSync(decodeFd)
+  assert.equal(decoded.status, 0, `recovered video failed to decode: ${decoded.error?.message ?? decoded.signal ?? ''}`)
+  const decodeErrors = fs.readFileSync(decodeLog, 'utf8').trim()
+  assert.equal(decodeErrors, '', `recovered video has decode errors: ${decodeErrors}`)
 
   console.log(`[recovery-e2e] ${recovered.manifest.id} video=${info.duration.toFixed(2)}s audio=${info.audioStreams.length}`)
   console.log('[recovery-e2e] PASS')

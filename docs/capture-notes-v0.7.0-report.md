@@ -43,7 +43,7 @@
 - `runToFile` 支持 AbortSignal；`muxSubtitles` / `burnSubtitles` 取消时杀掉 ffmpeg、删除半成品、抛「已取消」；
 - 文件 ASR 取消改为**协作停止**：不直接 terminate 正在 native decode 的 worker，先让当前块结束、发 `stop`、等 `stopped` 再 terminate；避免 sherpa 原生崩溃（之前 `0xC0000409`）。
 - `tests/cancel-e2e.mjs`：burn/mux/ASR 三段取消均 PASS，无残留最终输出；
-- `tests/recovery-e2e.mjs` PASS（TS 分片恢复 3.07 s）。
+- `tests/recovery-e2e.mjs` PASS（有效分片 + 损坏尾片；恢复 3.07 s，解码 0 error）。
 
 待补：真实强杀 DSH/窗口后的恢复演练、退出后孤儿进程检查。
 
@@ -55,6 +55,14 @@
 这里的 `stopReason=timeout` 是 Host `finalizeStop` 等待 worker 的 4 秒超时，不是“会话崩溃”或“30 秒空闲超时”。正常关闭 DSH 会先走收尾，因此不会触发恢复。
 
 真正触发恢复必须**强杀 DeepSeek Harness 主进程**（Task Manager「结束任务」或 `Stop-Process -Name 'DeepSeek Harness' -Force`），且要在 Host 正常收尾之前；重启后才会从 `native\video\part-*.ts` 生成 `recovered-*`。
+
+**2026-11-11 强杀 DSH 恢复成功**：生成 `recovered-20261111-075614`：
+
+- `status=aborted`、`crashRecovered=true`；
+- `screen.mp4` 21.0 s，2560×1600，1 条 AAC 音轨（mic），无 `ffmpeg` 残留；
+- `RECOVERY.md` 记录了分片数与音轨。
+
+发现的瑕疵：恢复成片解码时有一个宏块错误（`MB 9 79`），原因是恢复路径没有丢弃损坏尾片。已把正常收尾的 `dropCorruptTail` 复用到 `recoverOrphanRecording`；`recovery-e2e` 增加了“有效分片 + 损坏尾片”用例，并断言恢复成片解码 0 error，测试 PASS。当前这份 `recovered-20261111-075614/screen.mp4` 是修复前生成的，保留原样；下一次 DSH 重启后的恢复会使用修复代码。
 
 **文件任务中退出实测（2026-11-11）**：`file.json` 最终 `status=cancelled`、`stage=cancelled`、67%、12.3 s；`out\<slug>` 无任何 mp4/半成品；窗口进程退出，无 `ffmpeg` 残留。`work\<slug>\audio.wav`（13 MB）仍保留用于排查，作为已知临时文件清理限制记录。
 
