@@ -20,7 +20,7 @@ if ($ParentPid -gt 0) {
   $arguments += @('-ParentPid', [string]$ParentPid)
 }
 
-$process = Start-Process -FilePath $pwsh -ArgumentList $arguments -PassThru
+$process = Start-Process -FilePath $pwsh -ArgumentList $arguments -WindowStyle Normal -PassThru
 [pscustomobject]@{
   ok = $true
   pid = $process.Id

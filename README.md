@@ -186,16 +186,26 @@ pwsh -STA -File lib\window.ps1 -PreviewPath p0\.tmp\file.png -PreviewMode file -
 
 ## 重新打开窗口
 
-托盘「退出」会结束小窗进程。想继续使用有两种方式：
+托盘「退出」会结束小窗进程。想继续使用有这些方式：
 
 1. **重启 DSH**：Host 会按 `openOnStart` 自动拉起窗口。
-2. **不重启 DSH**，在普通 PowerShell 里执行：
+2. **鼠标双击**：
+   - 桌面或开始菜单里的「录屏字幕台」快捷方式；
+   - 或仓库根目录的 `打开录屏字幕台.cmd`。
+3. **命令行**（普通 PowerShell）：
 
 ```powershell
 pwsh -NoProfile -File scripts\open-window.ps1
 ```
 
-脚本会自动使用模块的 `runtime-data` 和自带 ffmpeg，避免手动启动时漏传 `-FfmpegPath`。
+快捷方式/`.cmd` 内部都会调用 `scripts\open-window.ps1`，自动使用模块的 `runtime-data` 和自带 ffmpeg，避免手动启动时漏传 `-FfmpegPath`。
+
+需要重新生成快捷方式时：
+
+```powershell
+pwsh -NoProfile -File scripts\create-shortcut.ps1
+# 只建开始菜单： -StartMenu
+```
 
 可选传入 DSH 父进程，让 DSH 退出时窗口一并关闭：
 
