@@ -47,7 +47,14 @@
 
 待补：真实强杀 DSH/窗口后的恢复演练、退出后孤儿进程检查。
 
-**2026-11-11 崩溃恢复测试结果（未命中恢复路径）**：最新会话 `cn-20261111-074431-a7dd` 为 `mode=record`、`status=completed`、`crashRecovered=false`、`stopReason=timeout`，`screen.mp4` 26 s 正常生成；没有 `sessions/recovered-*`，`native` 只剩部分 PCM 分片。说明当时只结束了窗口，Host 仍存活并在约 30 s 后正常收尾，不是 Host 崩溃恢复。正确测试需要强杀 **DeepSeek Harness 主进程**，且要在 Host 的 30 s 窗口超时收尾之前完成。
+**2026-11-11 崩溃恢复测试结果（未命中恢复路径）**：两次测试分别是结束窗口和正常关闭 DSH，Host 都还来得及正常收尾，所以没有 `sessions/recovered-*`。
+
+- `cn-20261111-074431-a7dd`：`status=completed`、`crashRecovered=false`、`stopReason=timeout`，`screen.mp4` 26 s；
+- `cn-20261111-075340-0d8b`：`status=completed`、`crashRecovered=false`、`stopReason=timeout`，`screen.mp4` 24 s。
+
+这里的 `stopReason=timeout` 是 Host `finalizeStop` 等待 worker 的 4 秒超时，不是“会话崩溃”或“30 秒空闲超时”。正常关闭 DSH 会先走收尾，因此不会触发恢复。
+
+真正触发恢复必须**强杀 DeepSeek Harness 主进程**（Task Manager「结束任务」或 `Stop-Process -Name 'DeepSeek Harness' -Force`），且要在 Host 正常收尾之前；重启后才会从 `native\video\part-*.ts` 生成 `recovered-*`。
 
 **文件任务中退出实测（2026-11-11）**：`file.json` 最终 `status=cancelled`、`stage=cancelled`、67%、12.3 s；`out\<slug>` 无任何 mp4/半成品；窗口进程退出，无 `ffmpeg` 残留。`work\<slug>\audio.wav`（13 MB）仍保留用于排查，作为已知临时文件清理限制记录。
 
