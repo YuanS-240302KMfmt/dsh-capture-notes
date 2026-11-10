@@ -47,6 +47,8 @@
 
 待补：真实强杀 DSH/窗口后的恢复演练、退出后孤儿进程检查。
 
+**2026-11-11 崩溃恢复测试结果（未命中恢复路径）**：最新会话 `cn-20261111-074431-a7dd` 为 `mode=record`、`status=completed`、`crashRecovered=false`、`stopReason=timeout`，`screen.mp4` 26 s 正常生成；没有 `sessions/recovered-*`，`native` 只剩部分 PCM 分片。说明当时只结束了窗口，Host 仍存活并在约 30 s 后正常收尾，不是 Host 崩溃恢复。正确测试需要强杀 **DeepSeek Harness 主进程**，且要在 Host 的 30 s 窗口超时收尾之前完成。
+
 **文件任务中退出实测（2026-11-11）**：`file.json` 最终 `status=cancelled`、`stage=cancelled`、67%、12.3 s；`out\<slug>` 无任何 mp4/半成品；窗口进程退出，无 `ffmpeg` 残留。`work\<slug>\audio.wav`（13 MB）仍保留用于排查，作为已知临时文件清理限制记录。
 
 ## M3：托盘与文件 tab
