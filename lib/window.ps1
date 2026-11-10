@@ -62,6 +62,8 @@ $script:localWarning = ''
 $script:trayEnabled = ($AutoCloseMs -le 0) -and [string]::IsNullOrWhiteSpace($PreviewPath) -and (-not $Diagnose)
 $script:allowClose = $false
 $script:exitAfterStop = $false
+$script:exitAfterFile = $false
+$script:exitAfterPost = $false
 $script:tray = $null
 $script:postWaiting = $false
 $script:postPromptedFor = ''
@@ -212,6 +214,21 @@ function Hide-CaptureWindow {
 }
 
 function Exit-CaptureNotes {
+  if ($script:fileProcessing) {
+    try {
+      [System.IO.File]::WriteAllText($script:fileCancelFile, (Get-Date).ToString('o'), [System.Text.UTF8Encoding]::new($false))
+    } catch {}
+    $script:exitAfterFile = $true
+    Set-Status '正在取消文件任务…' '#F2C94C'
+    if ($null -ne $script:tray) { Hide-CaptureWindow }
+    return
+  }
+  if ($script:postWaiting) {
+    $script:exitAfterPost = $true
+    Set-Status '等待字幕完成…' '#F2C94C'
+    if ($null -ne $script:tray) { Hide-CaptureWindow }
+    return
+  }
   if ($script:capturing) {
     Stop-Session
     $script:exitAfterStop = $true
@@ -1169,6 +1186,10 @@ function Update-FileState {
     Set-Status '文件处理失败' '#EB5757'
     Show-Error ([string]$state.error)
   }
+  if ($script:exitAfterFile) {
+    $script:exitAfterFile = $false
+    Exit-CaptureNotes
+  }
 }
 
 function Show-PostPrompt {
@@ -1220,6 +1241,10 @@ function Update-PostState {
     $script:postButtons.Visibility = 'Collapsed'
     $script:postProgress.Visibility = 'Collapsed'
   }
+  if ($script:exitAfterPost) {
+    $script:exitAfterPost = $false
+    Exit-CaptureNotes
+  }
 }
 
 $script:tabLive.Add_Click({ Switch-Mode 'live' })
@@ -1267,6 +1292,10 @@ $script:closeButton.Add_Click({
   if ($script:capturing) {
     Stop-Session
     $script:closeAfterStop = $true
+    return
+  }
+  if ($script:fileProcessing) {
+    Exit-CaptureNotes
     return
   }
   if ($script:trayEnabled -and $null -ne $script:tray) { Hide-CaptureWindow } else { Exit-CaptureNotes }
