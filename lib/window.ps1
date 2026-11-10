@@ -1031,7 +1031,7 @@ function Show-RecentMenu {
       [void]$menu.Items.Add($entry)
     }
   }
-  $menu.Show($script:recentButton, 0, $script:recentButton.ActualHeight)
+  $menu.Show([System.Windows.Forms.Cursor]::Position)
 }
 
 function Format-FileName([string]$name) {
@@ -1226,7 +1226,9 @@ $script:tabLive.Add_Click({ Switch-Mode 'live' })
 $script:tabRecord.Add_Click({ Switch-Mode 'record' })
 $script:tabFile.Add_Click({ Switch-Mode 'file' })
 $script:fileButton.Add_Click({ Select-File })
-$script:recentButton.Add_Click({ Show-RecentMenu })
+$script:recentButton.Add_Click({
+  try { Show-RecentMenu } catch { Show-Error ("最近会话打开失败：" + $_.Exception.Message) }
+})
 $script:subtitleButton.Add_Click({
   $script:fileSubtitleIndex = ($script:fileSubtitleIndex + 1) % $script:fileSubtitleModes.Count
   $script:subtitleButton.Content = $script:fileSubtitleLabels[$script:fileSubtitleIndex]
@@ -1494,8 +1496,17 @@ if (-not [string]::IsNullOrWhiteSpace($script:dataDirError)) {
 
 # Test hook: the window-host integration test drives a real capture without a
 # mouse. Both variables are ignored in normal use.
-if ($env:CAPTURE_NOTES_AUTOSTART -eq '1') {
-  $script:autoStartTimer = [System.Windows.Threading.DispatcherTimer]::new()
+if ($env:CAPTURE_NOTES_TEST_RECENT -eq '1') {
+  $recentTimer = [System.Windows.Threading.DispatcherTimer]::new()
+  $recentTimer.Interval = [TimeSpan]::FromSeconds(2)
+  $recentTimer.Add_Tick({
+    $recentTimer.Stop()
+    try { Show-RecentMenu } catch { Show-Error ("最近会话打开失败：" + $_.Exception.Message) }
+  })
+  $recentTimer.Start()
+}
+
+if ($env:CAPTURE_NOTES_AUTOSTART -eq '1') {  $script:autoStartTimer = [System.Windows.Threading.DispatcherTimer]::new()
   $script:autoStartTimer.Interval = [TimeSpan]::FromMilliseconds(1200)
   $script:autoStartTimer.Add_Tick({
     $script:autoStartTimer.Stop()

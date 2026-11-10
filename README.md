@@ -40,6 +40,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | `node tests/formats-e2e.mjs` | 纯音频、无音轨、MKV、内嵌字幕 |
 | `node tests/cancel-e2e.mjs` | 取消 ASR / mux / burn，无半成品 |
 | `pwsh -File tests/tray-e2e.ps1` | 关闭到托盘、quit 退出 |
+| `pwsh -File tests/recent-e2e.ps1` | 「最近」菜单打开不闪退 |
 | 真实 88 分钟文件（手工） | 814 段、174 s、峰值 591 MB、成片 10.9 GB |
 | 本地 `sessions\p4-demo\`（手工演示，不提交） | 技能：纪要、英文译文、双语字幕成片、简繁兜底 |
 
