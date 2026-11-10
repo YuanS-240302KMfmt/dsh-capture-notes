@@ -215,7 +215,7 @@ function Exit-CaptureNotes {
   if ($script:capturing) {
     Stop-Session
     $script:exitAfterStop = $true
-    Hide-CaptureWindow
+    if ($null -ne $script:tray) { Hide-CaptureWindow }
     return
   }
   $script:allowClose = $true
@@ -1267,7 +1267,7 @@ $script:closeButton.Add_Click({
     $script:closeAfterStop = $true
     return
   }
-  if ($script:trayEnabled) { Hide-CaptureWindow } else { Exit-CaptureNotes }
+  if ($script:trayEnabled -and $null -ne $script:tray) { Hide-CaptureWindow } else { Exit-CaptureNotes }
 })
 
 $script:micSettingsButton.Add_Click({
@@ -1350,7 +1350,7 @@ $script:heartbeatTimer.Add_Tick({
       if ($script:exitAfterStop) {
         $script:exitAfterStop = $false
         Exit-CaptureNotes
-      } elseif ($script:trayEnabled) {
+      } elseif ($script:trayEnabled -and $null -ne $script:tray) {
         Hide-CaptureWindow
       } else {
         $script:allowClose = $true
@@ -1384,7 +1384,7 @@ $window.Add_SourceInitialized({
     $source = [System.Windows.Interop.HwndSource]::FromHwnd($helper.Handle)
     $source.AddHook({
       param($hwnd, $msg, $wParam, $lParam, [ref]$handled)
-      if ($msg -eq 0x0010 -and $script:trayEnabled -and -not $script:allowClose) {
+      if ($msg -eq 0x0010 -and $script:trayEnabled -and $null -ne $script:tray -and -not $script:allowClose) {
         $handled.Value = $true
         Hide-CaptureWindow
       }
@@ -1399,7 +1399,7 @@ $window.Add_Closed({
 
 $window.Add_Closing({
   param($sender, $eventArgs)
-  if ($script:trayEnabled -and -not $script:allowClose) {
+  if ($script:trayEnabled -and $null -ne $script:tray -and -not $script:allowClose) {
     $eventArgs.Cancel = $true
     Hide-CaptureWindow
     return
