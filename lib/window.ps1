@@ -264,8 +264,10 @@ function Clear-Error {
 function Set-CapturingUi([bool]$on) {
   $script:systemCheck.IsEnabled = -not $on
   $script:micCheck.IsEnabled = -not $on
-  $script:sourceButton.IsEnabled = -not $on
-  $script:targetButton.IsEnabled = -not $on
+  foreach ($combo in @($script:sourceCombo, $script:targetCombo, $script:subtitleCombo, $script:monitorCombo)) {
+    $combo.IsEnabled = -not $on
+    $combo.Opacity = $(if ($on) { 0.6 } else { 1 })
+  }
   $script:tabRecord.IsEnabled = -not $on
   $script:startButton.IsEnabled = $true
   if ($on) {
@@ -770,7 +772,57 @@ $xaml = @'
         Title="录屏字幕台" Width="660" Height="480"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip"
+        AllowDrop="True"
         MinWidth="620" MinHeight="420" SnapsToDevicePixels="True" UseLayoutRounding="True">
+  <Window.Resources>
+    <Style x:Key="DarkCombo" TargetType="ComboBox">
+      <Setter Property="Background" Value="#222B3A"/>
+      <Setter Property="Foreground" Value="#C9D6EA"/>
+      <Setter Property="BorderBrush" Value="#2A3342"/>
+      <Setter Property="Padding" Value="6,2"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="6"/>
+              <ContentPresenter Margin="8,0,24,0" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                Content="{TemplateBinding SelectionBoxItem}"
+                                ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
+              <Path Data="M 0 0 L 4 4 L 8 0" Stroke="#8FA6C8" StrokeThickness="1.4"
+                    HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"/>
+              <ToggleButton ClickMode="Press" Background="Transparent" BorderThickness="0"
+                            IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border Background="Transparent"/>
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True"
+                     Focusable="False" PopupAnimation="Slide" StaysOpen="False">
+                <Border Background="#1A2230" BorderBrush="#2A3342" BorderThickness="1" CornerRadius="6"
+                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="220">
+                  <ScrollViewer>
+                    <ItemsPresenter/>
+                  </ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+          <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#1A2230"/>
+            <Setter Property="Foreground" Value="#C9D6EA"/>
+            <Setter Property="Padding" Value="8,5"/>
+          </Style>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
   <Border CornerRadius="12" Background="#151A23" BorderBrush="#2A3342" BorderThickness="1">
     <Grid>
       <Grid.RowDefinitions>
@@ -812,11 +864,11 @@ $xaml = @'
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
           <Button x:Name="FileButton" Content="选择文件" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="选择本地视频或音频"/>
-          <Button x:Name="SubtitleButton" Content="软字幕" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="字幕形态"/>
-          <Button x:Name="RecentButton" Content="最近" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="最近会话"/>
-          <Button x:Name="MonitorButton" Content="显示器 1" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="录制哪个显示器"/>
-          <Button x:Name="SourceButton" Content="自动" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" ToolTip="源语言"/>
-          <Button x:Name="TargetButton" Content="简体中文" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" ToolTip="目标语言"/>
+          <ComboBox x:Name="SubtitleCombo" Width="96" Height="28" Style="{StaticResource DarkCombo}" FontSize="11" Margin="0,0,8,0" Visibility="Collapsed" ToolTip="字幕形态"/>
+          <Button x:Name="RecentButton" Content="最近" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="10,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="最近会话"/>
+          <ComboBox x:Name="MonitorCombo" Width="112" Height="28" Style="{StaticResource DarkCombo}" FontSize="11" Margin="0,0,8,0" Visibility="Collapsed" ToolTip="录制哪个显示器"/>
+          <ComboBox x:Name="SourceCombo" Width="76" Height="28" Style="{StaticResource DarkCombo}" FontSize="11" Margin="0,0,8,0" ToolTip="源语言"/>
+          <ComboBox x:Name="TargetCombo" Width="100" Height="28" Style="{StaticResource DarkCombo}" FontSize="11" Margin="0,0,8,0" ToolTip="目标语言"/>
           <Button x:Name="FileOpen" Content="打开目录" Background="#2A3342" Foreground="#C9D6EA" BorderThickness="0" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Cursor="Hand" ToolTip="打开输出目录"/>
           <Button x:Name="StartButton" Content="● 开始" Background="#E5484D" Foreground="#FFFFFF" BorderThickness="0" Padding="16,6" FontWeight="SemiBold" Cursor="Hand"/>
         </StackPanel>
@@ -878,8 +930,8 @@ $script:tabRecord = $window.FindName('TabRecord')
 $script:tabFile = $window.FindName('TabFile')
 $script:systemCheck = $window.FindName('SystemCheck')
 $script:micCheck = $window.FindName('MicCheck')
-$script:sourceButton = $window.FindName('SourceButton')
-$script:targetButton = $window.FindName('TargetButton')
+$script:sourceCombo = $window.FindName('SourceCombo')
+$script:targetCombo = $window.FindName('TargetCombo')
 $script:startButton = $window.FindName('StartButton')
 $script:subtitleScroll = $window.FindName('SubtitleScroll')
 $script:subtitlePanel = $window.FindName('SubtitlePanel')
@@ -890,9 +942,9 @@ $script:errorBar = $window.FindName('ErrorBar')
 $script:errorText = $window.FindName('ErrorText')
 $script:micSettingsButton = $window.FindName('MicSettingsButton')
 $script:modeHint = $window.FindName('ModeHint')
-$script:monitorButton = $window.FindName('MonitorButton')
+$script:monitorCombo = $window.FindName('MonitorCombo')
 $script:fileButton = $window.FindName('FileButton')
-$script:subtitleButton = $window.FindName('SubtitleButton')
+$script:subtitleCombo = $window.FindName('SubtitleCombo')
 $script:recentButton = $window.FindName('RecentButton')
 $script:fileOpen = $window.FindName('FileOpen')
 $script:postPanel = $window.FindName('PostPanel')
@@ -944,11 +996,23 @@ try {
   }
   if ($script:monitors.Count -gt 0) {
     $script:monitorIndex = $primaryIndex
-    $script:monitorButton.Content = $script:monitorLabels[$script:monitorIndex]
+    $script:monitorCombo.SelectedIndex = $script:monitorIndex
   }
 } catch {
   Show-Error "无法枚举显示器：$($_.Exception.Message)"
 }
+
+$script:comboSyncing = $false
+$script:sourceCombo.ItemsSource = $script:sourceLabels
+$script:targetCombo.ItemsSource = $script:targetLabels
+$script:subtitleCombo.ItemsSource = $script:fileSubtitleLabels
+$script:monitorCombo.ItemsSource = $script:monitorLabels
+$script:comboSyncing = $true
+$script:sourceCombo.SelectedIndex = $script:sourceIndex
+$script:targetCombo.SelectedIndex = $script:targetIndex
+$script:subtitleCombo.SelectedIndex = $script:fileSubtitleIndex
+$script:monitorCombo.SelectedIndex = $script:monitorIndex
+$script:comboSyncing = $false
 
 function Get-ModeLabel {
   switch ($script:mode) {
@@ -956,6 +1020,10 @@ function Get-ModeLabel {
     'file' { return '文件' }
     default { return '实时' }
   }
+}
+
+function Update-ModeHint {
+  $script:modeHint.Text = (Get-ModeLabel) + ' · ' + $script:sourceLabels[$script:sourceIndex] + ' → ' + $script:targetLabels[$script:targetIndex]
 }
 
 function Set-FileUi([bool]$on) {
@@ -969,10 +1037,11 @@ function Set-FileUi([bool]$on) {
     $script:startButton.Foreground = New-Brush '#FFFFFF'
   }
   $script:fileButton.IsHitTestVisible = -not $on
-  $script:subtitleButton.IsHitTestVisible = -not $on
-  $script:sourceButton.IsHitTestVisible = -not $on
+  $script:subtitleCombo.IsEnabled = -not $on
+  $script:sourceCombo.IsEnabled = -not $on
+  $script:targetCombo.IsEnabled = -not $on
   $script:fileButton.Opacity = $(if ($on) { 0.6 } else { 1 })
-  $script:subtitleButton.Opacity = $(if ($on) { 0.6 } else { 1 })
+  $script:subtitleCombo.Opacity = $(if ($on) { 0.6 } else { 1 })
   $script:tabLive.IsEnabled = -not $on
   $script:tabRecord.IsEnabled = -not $on
 }
@@ -1060,7 +1129,7 @@ function Show-FileHint {
   $panel = $script:subtitlePanel
   $panel.Children.Clear()
   $hint = [System.Windows.Controls.TextBlock]::new()
-  $hint.Text = '选择文件后点「开始处理」；逐字稿、字幕与成片会写到 out\<slug>\。'
+  $hint.Text = '选择文件，或把视频/音频直接拖到窗口；然后点「开始处理」。逐字稿、字幕与成片会写到 out\<slug>\。'
   $hint.Foreground = New-Brush '#4E5B73'
   $hint.FontSize = 12.5
   $hint.TextWrapping = 'Wrap'
@@ -1081,9 +1150,9 @@ function Switch-Mode([string]$mode) {
   $script:tabRecord.Foreground = New-Brush $(if ($recordActive) { '#E8EEF9' } else { '#8FA6C8' })
   $script:tabFile.Background = New-Brush $(if ($fileActive) { '#222B3A' } else { 'Transparent' })
   $script:tabFile.Foreground = New-Brush $(if ($fileActive) { '#E8EEF9' } else { '#8FA6C8' })
-  $script:monitorButton.Visibility = $(if ($recordActive) { 'Visible' } else { 'Collapsed' })
+  $script:monitorCombo.Visibility = $(if ($recordActive) { 'Visible' } else { 'Collapsed' })
   $script:fileButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
-  $script:subtitleButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
+  $script:subtitleCombo.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
   $script:recentButton.Visibility = $(if ($fileActive) { 'Visible' } else { 'Collapsed' })
   $script:systemCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
   $script:micCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
@@ -1092,7 +1161,7 @@ function Switch-Mode([string]$mode) {
   $script:startButton.Foreground = New-Brush '#FFFFFF'
   if ($fileActive) {
     $script:startButton.Content = '● 开始处理'
-    $script:subtitleButton.Content = $script:fileSubtitleLabels[$script:fileSubtitleIndex]
+    $script:subtitleCombo.SelectedIndex = $script:fileSubtitleIndex
     $script:elapsedText.Text = ''
     Show-FileHint
   } else {
@@ -1116,18 +1185,27 @@ function Test-DiskSpace {
   return $true
 }
 
+function Test-MediaPath([string]$path) {
+  $ext = [System.IO.Path]::GetExtension($path).ToLowerInvariant()
+  return $ext -in @('.mp4', '.mkv', '.mov', '.avi', '.webm', '.mp3', '.wav', '.m4a', '.flac')
+}
+
+function Set-FileInput([string]$path) {
+  $script:fileInput = $path
+  $script:fileButton.Content = Format-FileName ([System.IO.Path]::GetFileName($path))
+  $script:fileOutDir = ''
+  $script:fileOpen.Visibility = 'Collapsed'
+  Clear-Error
+  Set-Status ('已选择 · ' + [System.IO.Path]::GetFileName($path)) '#8FA6C8'
+}
+
 function Select-File {
   $dialog = [System.Windows.Forms.OpenFileDialog]::new()
   $dialog.Title = '选择视频或音频'
   $dialog.Filter = '媒体文件|*.mp4;*.mkv;*.mov;*.avi;*.webm;*.mp3;*.wav;*.m4a;*.flac|所有文件|*.*'
   $dialog.CheckFileExists = $true
   if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
-  $script:fileInput = $dialog.FileName
-  $script:fileButton.Content = Format-FileName ([System.IO.Path]::GetFileName($dialog.FileName))
-  $script:fileOutDir = ''
-  $script:fileOpen.Visibility = 'Collapsed'
-  Clear-Error
-  Set-Status ('已选择 · ' + [System.IO.Path]::GetFileName($dialog.FileName)) '#8FA6C8'
+  Set-FileInput $dialog.FileName
 }
 
 function Start-FileJob {
@@ -1254,9 +1332,48 @@ $script:fileButton.Add_Click({ Select-File })
 $script:recentButton.Add_Click({
   try { Show-RecentMenu } catch { Show-Error ("最近会话打开失败：" + $_.Exception.Message) }
 })
-$script:subtitleButton.Add_Click({
-  $script:fileSubtitleIndex = ($script:fileSubtitleIndex + 1) % $script:fileSubtitleModes.Count
-  $script:subtitleButton.Content = $script:fileSubtitleLabels[$script:fileSubtitleIndex]
+
+$window.Add_DragOver({
+  param($sender, $eventArgs)
+  if ($script:mode -ne 'file') {
+    $eventArgs.Effects = 'None'
+    $eventArgs.Handled = $true
+    return
+  }
+  if ($eventArgs.Data.GetDataPresent([System.Windows.DataFormats]::FileDrop)) {
+    $files = @($eventArgs.Data.GetData([System.Windows.DataFormats]::FileDrop))
+    if ($files.Count -eq 1 -and (Test-MediaPath $files[0])) {
+      $eventArgs.Effects = 'Copy'
+    } else {
+      $eventArgs.Effects = 'None'
+    }
+    $eventArgs.Handled = $true
+  }
+})
+
+$window.Add_Drop({
+  param($sender, $eventArgs)
+  if ($script:mode -ne 'file') { return }
+  if (-not $eventArgs.Data.GetDataPresent([System.Windows.DataFormats]::FileDrop)) { return }
+  $files = @($eventArgs.Data.GetData([System.Windows.DataFormats]::FileDrop))
+  if ($files.Count -ne 1) {
+    Show-Error '请一次拖入一个视频或音频文件。'
+    $eventArgs.Handled = $true
+    return
+  }
+  if (-not (Test-MediaPath $files[0])) {
+    Show-Error '不支持的文件类型；请拖入 mp4/mkv/mov/avi/webm/mp3/wav/m4a/flac。'
+    $eventArgs.Handled = $true
+    return
+  }
+  Set-FileInput $files[0]
+  $eventArgs.Handled = $true
+})
+$script:subtitleCombo.Add_SelectionChanged({
+  if ($script:comboSyncing) { return }
+  if ($script:subtitleCombo.SelectedIndex -ge 0) {
+    $script:fileSubtitleIndex = $script:subtitleCombo.SelectedIndex
+  }
 })
 $script:fileOpen.Add_Click({
   $target = [string]$script:fileOpen.Tag
@@ -1264,10 +1381,11 @@ $script:fileOpen.Add_Click({
     try { Start-Process explorer.exe -ArgumentList $target } catch {}
   }
 })
-$script:monitorButton.Add_Click({
-  if ($script:monitors.Count -lt 2) { return }
-  $script:monitorIndex = ($script:monitorIndex + 1) % $script:monitors.Count
-  $script:monitorButton.Content = $script:monitorLabels[$script:monitorIndex]
+$script:monitorCombo.Add_SelectionChanged({
+  if ($script:comboSyncing) { return }
+  if ($script:monitorCombo.SelectedIndex -ge 0) {
+    $script:monitorIndex = $script:monitorCombo.SelectedIndex
+  }
 })
 $script:postSoft.Add_Click({ Request-Post 'soft' })
 $script:postBurn.Add_Click({ Request-Post 'burn' })
@@ -1307,15 +1425,19 @@ $script:micSettingsButton.Add_Click({
   }
 })
 
-$script:sourceButton.Add_Click({
-  $script:sourceIndex = ($script:sourceIndex + 1) % $script:sourceCodes.Count
-  $script:sourceButton.Content = $script:sourceLabels[$script:sourceIndex]
-  $script:modeHint.Text = (Get-ModeLabel) + ' · ' + $script:sourceLabels[$script:sourceIndex] + ' → ' + $script:targetLabels[$script:targetIndex]
+$script:sourceCombo.Add_SelectionChanged({
+  if ($script:comboSyncing) { return }
+  if ($script:sourceCombo.SelectedIndex -ge 0) {
+    $script:sourceIndex = $script:sourceCombo.SelectedIndex
+    Update-ModeHint
+  }
 })
-$script:targetButton.Add_Click({
-  $script:targetIndex = ($script:targetIndex + 1) % $script:targetCodes.Count
-  $script:targetButton.Content = $script:targetLabels[$script:targetIndex]
-  $script:modeHint.Text = (Get-ModeLabel) + ' · ' + $script:sourceLabels[$script:sourceIndex] + ' → ' + $script:targetLabels[$script:targetIndex]
+$script:targetCombo.Add_SelectionChanged({
+  if ($script:comboSyncing) { return }
+  if ($script:targetCombo.SelectedIndex -ge 0) {
+    $script:targetIndex = $script:targetCombo.SelectedIndex
+    Update-ModeHint
+  }
 })
 $script:startButton.Add_Click({
   if ($script:mode -eq 'file') { Start-FileJob; return }

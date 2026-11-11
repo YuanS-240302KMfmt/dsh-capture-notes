@@ -22,6 +22,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | **P4 技能与纪要** | ✅ 全局技能已安装、纪要/译文/文件三条工作流、演示会话产物 |
 | **P5 打包与独立性** | ✅ 本地安装自带模型/运行时、profile 接入、`selfContained` 与空参考目录验证；GitHub clone 不含这两块（见「从源码运行」） |
 | **0.7.0 稳定性/格式/托盘** | ✅ 已发布；长录屏/后处理退出留 0.8.0 |
+| **0.7.1 下拉框与拖拽** | ✅ 语言/字幕形态/显示器改为下拉框；文件 tab 支持拖入文件 |
 
 测试（全部通过）：
 
@@ -41,6 +42,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | `node tests/cancel-e2e.mjs` | 取消 ASR / mux / burn，无半成品 |
 | `pwsh -File tests/tray-e2e.ps1` | 关闭到托盘、quit 退出 |
 | `pwsh -File tests/recent-e2e.ps1` | 「最近」菜单打开不闪退 |
+| 手动：文件 tab 拖入 mp4/mkv | 文件按钮显示文件名，可直接开始处理 |
 | 真实 88 分钟文件（手工） | 814 段、174 s、峰值 591 MB、成片 10.9 GB |
 | 本地 `sessions\p4-demo\`（手工演示，不提交） | 技能：纪要、英文译文、双语字幕成片、简繁兜底 |
 
@@ -159,6 +161,7 @@ pwsh -File scripts\install-skill.ps1
 - 重启验收清单：[`docs/capture-notes-restart-verification.md`](docs/capture-notes-restart-verification.md)（preflight / after 检查、手动验收、失败处理、回滚）。
 - 本次重启结果：[`docs/capture-notes-restart-report.md`](docs/capture-notes-restart-report.md)（Host 实时/文件/录屏+后处理、双音轨、文件三形态与译文烧录已通过）。
 - 0.7.0 需求：[`docs/capture-notes-v0.7.0-requirements.md`](docs/capture-notes-v0.7.0-requirements.md)；实施记录：[`docs/capture-notes-v0.7.0-report.md`](docs/capture-notes-v0.7.0-report.md)。
+- 0.7.1 改动：[`docs/capture-notes-v0.7.1-report.md`](docs/capture-notes-v0.7.1-report.md)。
 - `models\`、`runtime\` 已在 `.gitignore`；npm `files` 不包含它们，当前是本地 link 安装，不是 npm 发布包。
 
 ## 运行与自检
