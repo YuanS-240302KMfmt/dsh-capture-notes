@@ -1163,6 +1163,34 @@ function Show-FileHint {
   $script:lastSignature = 'file'
 }
 
+function Invoke-FfmpegThumbnail([string]$ffmpeg, [string]$inputPath, [string]$outputPath, [bool]$seek) {
+  $arguments = @('-hide_banner', '-loglevel', 'error')
+  if ($seek) { $arguments += @('-ss', '1') }
+  $arguments += @('-i', $inputPath, '-frames:v', '1', '-vf', 'scale=640:-2', '-y', $outputPath)
+  try {
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $ffmpeg
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardError = $true
+    foreach ($argument in $arguments) { [void]$psi.ArgumentList.Add($argument) }
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+      try {
+        Add-Content -LiteralPath (Join-Path $script:dataDir 'window-error.log') -Value ("[{0}] thumbnail exit={1} {2}" -f (Get-Date).ToString('o'), $proc.ExitCode, $stderr.Trim())
+      } catch {}
+    }
+    return $proc.ExitCode
+  } catch {
+    try {
+      Add-Content -LiteralPath (Join-Path $script:dataDir 'window-error.log') -Value ("[{0}] thumbnail failed: {1}" -f (Get-Date).ToString('o'), $_.Exception.Message)
+    } catch {}
+    return -1
+  }
+}
+
 function Show-FilePreview {
   if ([string]::IsNullOrWhiteSpace($script:fileInput) -or -not (Test-Path -LiteralPath $script:fileInput)) {
     Show-FileHint
@@ -1181,12 +1209,9 @@ function Show-FilePreview {
   try {
     if (-not $isAudio -and -not [string]::IsNullOrWhiteSpace($ffmpeg) -and (Test-Path -LiteralPath $ffmpeg)) {
       Remove-Item -LiteralPath $script:fileThumbPath -Force -ErrorAction SilentlyContinue
-      $args = @('-hide_banner', '-loglevel', 'error', '-ss', '1', '-i', $script:fileInput,
-        '-frames:v', '1', '-vf', 'scale=640:-2', '-y', $script:fileThumbPath)
-      Start-Process -FilePath $ffmpeg -ArgumentList $args -Wait -WindowStyle Hidden | Out-Null
+      [void](Invoke-FfmpegThumbnail $ffmpeg $script:fileInput $script:fileThumbPath $true)
       if (-not (Test-Path -LiteralPath $script:fileThumbPath)) {
-        Start-Process -FilePath $ffmpeg -ArgumentList @('-hide_banner', '-loglevel', 'error', '-i', $script:fileInput,
-          '-frames:v', '1', '-vf', 'scale=640:-2', '-y', $script:fileThumbPath) -Wait -WindowStyle Hidden | Out-Null
+        [void](Invoke-FfmpegThumbnail $ffmpeg $script:fileInput $script:fileThumbPath $false)
       }
     }
   } catch {}

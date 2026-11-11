@@ -9,7 +9,8 @@
 - 文件选中/拖入后，在字幕区显示视频第 1 秒的封面；
 - 封面用模块自带 ffmpeg 抽取到 `runtime-data\file-thumb.jpg`，WPF `BitmapImage` 加载；
 - 音频文件显示“音频文件（无视频封面）”，抽取失败显示“无法生成视频封面”；
-- 封面显示文件名，保留拖入/选择的提示。
+- 封面显示文件名，保留拖入/选择的提示；
+- 修复含空格/长文件名：`Start-Process -ArgumentList` 会把路径拆开，改用 `ProcessStartInfo.ArgumentList`；已用 `... 和另外 11 个页面 ...mp4` 实测出封面。
 
 ### 打开输出目录
 
