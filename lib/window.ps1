@@ -46,10 +46,16 @@ $script:postResultFile = Join-Path $script:nativeDir 'post.json'
 $script:fileRequestFile = Join-Path $script:nativeDir 'file.request'
 $script:fileCancelFile = Join-Path $script:nativeDir 'file.cancel'
 $script:fileResultFile = Join-Path $script:nativeDir 'file.json'
+$script:summaryRequestFile = Join-Path $script:nativeDir 'summary.request'
+$script:summaryCancelFile = Join-Path $script:nativeDir 'summary.cancel'
+$script:summaryResultFile = Join-Path $script:nativeDir 'summary.json'
 $script:fileInput = ''
 $script:fileProcessing = $false
 $script:fileOutDir = ''
 $script:fileThumbPath = Join-Path $script:dataDir 'file-thumb.jpg'
+$script:summaryRunning = $false
+$script:summaryDir = ''
+$script:summaryConsent = $false
 $script:fileSubtitleModes = @('soft', 'burn', 'both', 'none')
 $script:fileSubtitleLabels = @('软字幕', '硬字幕', '软+硬', '仅字幕')
 $script:fileSubtitleIndex = 0
@@ -764,6 +770,7 @@ function Update-FromSnapshot {
 
   $script:elapsedText.Text = Format-Clock ([double]$snapshot.elapsedMs / 1000)
   Render-Snapshot $snapshot
+  Update-SummaryButton
 }
 
 # --------------------------------------------------------------------- UI ---
@@ -896,12 +903,31 @@ $xaml = @'
         </StackPanel>
       </Border>
 
+      <Border x:Name="SummaryPanel" Grid.Row="4" Margin="16,0,16,8" Background="#FF10151D" BorderBrush="#33405A" BorderThickness="1" CornerRadius="10" Visibility="Collapsed">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <StackPanel Orientation="Horizontal" Margin="16,12,16,6">
+            <TextBlock Text="内容纪要" Foreground="#E8EEF9" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <Button x:Name="SummaryOpen" Content="打开 notes.md" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="10,4" Margin="14,0,0,0" Cursor="Hand" Visibility="Collapsed"/>
+            <Button x:Name="SummaryRegenerate" Content="重新生成" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="10,4" Margin="8,0,0,0" Cursor="Hand"/>
+            <Button x:Name="SummaryClose" Content="关闭" Background="Transparent" Foreground="#7C8AA5" BorderThickness="0" Padding="10,4" Margin="8,0,0,0" Cursor="Hand"/>
+          </StackPanel>
+          <ScrollViewer Grid.Row="1" Margin="16,0,10,10" VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="SummaryText" Foreground="#C9D6EA" FontSize="12.5" TextWrapping="Wrap" LineHeight="20"/>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+
       <Grid Grid.Row="5" Margin="16,0,16,6">
         <StackPanel Orientation="Horizontal">
           <Ellipse x:Name="StatusDot" Width="7" Height="7" Fill="#5B6B8C" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <TextBlock x:Name="StatusText" Text="等待开始" Foreground="#8FA6C8" FontSize="12"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="SummaryButton" Content="生成纪要" Background="#1E3A5F" Foreground="#C9D6EA" BorderThickness="0" Padding="8,2" Margin="0,0,8,0" FontSize="11" Cursor="Hand" Visibility="Collapsed" ToolTip="把逐字稿发送给当前 DSH 模型生成内容纪要"/>
           <Button x:Name="OpenOutputButton" Content="打开输出" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="8,2" Margin="0,0,10,0" FontSize="11" Cursor="Hand" Visibility="Collapsed" ToolTip="打开当前会话或文件输出目录"/>
           <TextBlock x:Name="ElapsedText" Text="00:00" Foreground="#5B6B8C" FontSize="12"/>
         </StackPanel>
@@ -943,6 +969,12 @@ $script:statusDot = $window.FindName('StatusDot')
 $script:statusText = $window.FindName('StatusText')
 $script:elapsedText = $window.FindName('ElapsedText')
 $script:openOutputButton = $window.FindName('OpenOutputButton')
+$script:summaryButton = $window.FindName('SummaryButton')
+$script:summaryPanel = $window.FindName('SummaryPanel')
+$script:summaryText = $window.FindName('SummaryText')
+$script:summaryOpen = $window.FindName('SummaryOpen')
+$script:summaryRegenerate = $window.FindName('SummaryRegenerate')
+$script:summaryClose = $window.FindName('SummaryClose')
 $script:errorBar = $window.FindName('ErrorBar')
 $script:errorText = $window.FindName('ErrorText')
 $script:micSettingsButton = $window.FindName('MicSettingsButton')
@@ -1048,6 +1080,115 @@ function Open-OutputFolder {
   }
   try { Start-Process explorer.exe -ArgumentList $target } catch {
     Show-Error ('无法打开输出目录：' + $_.Exception.Message)
+  }
+}
+
+function Get-SummaryDir {
+  if ($script:mode -eq 'file') {
+    if (-not [string]::IsNullOrWhiteSpace($script:fileOutDir) -and (Test-Path -LiteralPath (Join-Path $script:fileOutDir 'transcript.md'))) {
+      return $script:fileOutDir
+    }
+    return ''
+  }
+  if ($script:mode -eq 'record' -and -not [string]::IsNullOrWhiteSpace($script:lastSessionId)) {
+    $dir = Join-Path (Join-Path $script:moduleRoot 'sessions') $script:lastSessionId
+    if (Test-Path -LiteralPath (Join-Path $dir 'transcript.md')) { return $dir }
+  }
+  return ''
+}
+
+function Update-SummaryButton {
+  if ($script:mode -eq 'live') {
+    $script:summaryButton.Visibility = 'Collapsed'
+    return
+  }
+  $dir = Get-SummaryDir
+  if ([string]::IsNullOrWhiteSpace($dir)) {
+    $script:summaryButton.Visibility = 'Collapsed'
+    return
+  }
+  $script:summaryButton.Visibility = 'Visible'
+  $script:summaryButton.IsEnabled = $true
+  $script:summaryButton.Content = $(if ($script:summaryRunning) { '取消纪要' } else { '生成纪要' })
+}
+
+function Format-SummaryText([string]$text) {
+  $lines = $text -split "`r?`n"
+  $output = foreach ($line in $lines) {
+    $line = $line -replace '^#{1,6}\s*', ''
+    $line = $line -replace '\*\*', '' -replace '`', ''
+    $line = $line -replace '^\s*[-*]\s+', '• '
+    $line = $line -replace '\[(.*?)\]\((.*?)\)', '$1'
+    $line
+  }
+  return (($output -join "`r`n").Trim())
+}
+
+function Start-Summary {
+  if ($script:summaryRunning) {
+    [System.IO.File]::WriteAllText($script:summaryCancelFile, (Get-Date).ToString('o'), [System.Text.UTF8Encoding]::new($false))
+    Set-Status '正在取消纪要…' '#F2C94C'
+    return
+  }
+  $dir = Get-SummaryDir
+  if ([string]::IsNullOrWhiteSpace($dir)) {
+    Show-Error '还没有可总结的逐字稿；请先完成录屏或文件处理。'
+    return
+  }
+  if (-not $script:summaryConsent) {
+    $answer = [System.Windows.MessageBox]::Show(
+      "生成纪要会把逐字稿发送给当前配置的 DSH 模型。继续吗？`r`n`r`n逐字稿仅用于本次总结，不会上传音频或视频。",
+      '生成内容纪要',
+      [System.Windows.MessageBoxButton]::YesNo,
+      [System.Windows.MessageBoxImage]::Question)
+    if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+    $script:summaryConsent = $true
+  }
+  Remove-Item -LiteralPath $script:summaryRequestFile, $script:summaryCancelFile, $script:summaryResultFile -Force -ErrorAction SilentlyContinue
+  Write-JsonFile $script:summaryRequestFile ([pscustomobject]@{ dir = $dir })
+  $script:summaryRunning = $true
+  $script:summaryDir = $dir
+  $script:postPanel.Visibility = 'Collapsed'
+  $script:summaryPanel.Visibility = 'Visible'
+  $script:summaryText.Text = '正在读取逐字稿并生成纪要…'
+  $script:summaryOpen.Visibility = 'Collapsed'
+  $script:summaryRegenerate.IsEnabled = $false
+  Set-Status '正在生成内容纪要…' '#F2C94C'
+  Update-SummaryButton
+}
+
+function Update-SummaryState {
+  if (-not $script:summaryRunning) { return }
+  if (-not (Test-Path -LiteralPath $script:summaryResultFile)) { return }
+  $state = $null
+  try { $state = Get-Content -LiteralPath $script:summaryResultFile -Raw | ConvertFrom-Json } catch { return }
+  if ($null -eq $state) { return }
+  if ($state.status -eq 'running') {
+    $percent = 0
+    [void][int]::TryParse([string]$state.percent, [ref]$percent)
+    $script:summaryText.Text = ([string]$state.stage) + $(if ($percent -gt 0) { " · $percent%" } else { '' })
+    return
+  }
+  $script:summaryRunning = $false
+  $script:summaryRegenerate.IsEnabled = $true
+  Update-SummaryButton
+  if ($state.status -eq 'done') {
+    $notes = Join-Path $script:summaryDir 'notes.md'
+    try {
+      $script:summaryText.Text = Format-SummaryText (Get-Content -LiteralPath $notes -Raw)
+      $script:summaryOpen.Tag = $notes
+      $script:summaryOpen.Visibility = 'Visible'
+      Set-Status '内容纪要已生成' '#6FCF97'
+    } catch {
+      $script:summaryText.Text = '纪要已生成，但读取 notes.md 失败。'
+      Show-Error ('读取 notes.md 失败：' + $_.Exception.Message)
+    }
+  } elseif ($state.status -eq 'cancelled') {
+    $script:summaryText.Text = '已取消生成。'
+    Set-Status '已取消纪要' '#8FA6C8'
+  } else {
+    $script:summaryText.Text = '生成失败：' + [string]$state.error
+    Show-Error ('内容纪要生成失败：' + [string]$state.error)
   }
 }
 
@@ -1295,7 +1436,9 @@ function Switch-Mode([string]$mode) {
   }
   $script:modeHint.Text = (Get-ModeLabel) + ' · ' + $script:sourceLabels[$script:sourceIndex] + ' → ' + $script:targetLabels[$script:targetIndex]
   $script:postPanel.Visibility = 'Collapsed'
+  $script:summaryPanel.Visibility = 'Collapsed'
   Set-Status '等待开始' '#5B6B8C'
+  Update-SummaryButton
 }
 
 function Test-DiskSpace {
@@ -1322,6 +1465,8 @@ function Set-FileInput([string]$path) {
   $script:fileOpen.Visibility = 'Collapsed'
   Clear-Error
   Set-Status ('已选择 · ' + [System.IO.Path]::GetFileName($path)) '#8FA6C8'
+  $script:summaryPanel.Visibility = 'Collapsed'
+  Update-SummaryButton
   Show-FilePreview
 }
 
@@ -1393,7 +1538,9 @@ function Update-FileState {
   if ($script:exitAfterFile) {
     $script:exitAfterFile = $false
     Exit-CaptureNotes
+    return
   }
+  Update-SummaryButton
 }
 
 function Show-PostPrompt {
@@ -1508,6 +1655,15 @@ $script:fileOpen.Add_Click({
   }
 })
 $script:openOutputButton.Add_Click({ Open-OutputFolder })
+$script:summaryButton.Add_Click({ Start-Summary })
+$script:summaryRegenerate.Add_Click({ Start-Summary })
+$script:summaryClose.Add_Click({ $script:summaryPanel.Visibility = 'Collapsed' })
+$script:summaryOpen.Add_Click({
+  $path = [string]$script:summaryOpen.Tag
+  if (-not [string]::IsNullOrWhiteSpace($path) -and (Test-Path -LiteralPath $path)) {
+    try { Start-Process -FilePath $path } catch { Show-Error ('无法打开 notes.md：' + $_.Exception.Message) }
+  }
+})
 $script:monitorCombo.Add_SelectionChanged({
   if ($script:comboSyncing) { return }
   if ($script:monitorCombo.SelectedIndex -ge 0) {
@@ -1591,6 +1747,11 @@ $script:fileTimer = [System.Windows.Threading.DispatcherTimer]::new()
 $script:fileTimer.Interval = [TimeSpan]::FromMilliseconds(500)
 $script:fileTimer.Add_Tick({ Update-FileState })
 $script:fileTimer.Start()
+
+$script:summaryTimer = [System.Windows.Threading.DispatcherTimer]::new()
+$script:summaryTimer.Interval = [TimeSpan]::FromMilliseconds(500)
+$script:summaryTimer.Add_Tick({ Update-SummaryState })
+$script:summaryTimer.Start()
 
 $script:diskTimer = [System.Windows.Threading.DispatcherTimer]::new()
 $script:diskTimer.Interval = [TimeSpan]::FromSeconds(60)
@@ -1755,6 +1916,11 @@ if (-not [string]::IsNullOrWhiteSpace($PreviewPath)) {
   }
   Render-Snapshot $fake
   if ($PreviewPost) { Show-PostPrompt }
+  if ($env:CAPTURE_NOTES_PREVIEW_SUMMARY -eq '1' -and $PreviewMode -ne 'live') {
+    $script:summaryPanel.Visibility = 'Visible'
+    $script:summaryOpen.Visibility = 'Visible'
+    $script:summaryText.Text = "测试纪要`r`n`r`n• 发布计划讨论`r`n• 周五前完成测试"
+  }
   if ($PreviewMode -ne 'file') { $script:elapsedText.Text = Format-Clock ([double]$fake.elapsedMs / 1000) }
   $window.Show()
   $window.UpdateLayout()
@@ -1819,6 +1985,7 @@ if ($env:CAPTURE_NOTES_AUTOSTART -eq '1') {  $script:autoStartTimer = [System.Wi
   $script:autoStartTimer.Start()
 }
 
+Update-SummaryButton
 if (-not [string]::IsNullOrWhiteSpace($PreviewPath)) {
   $window.ShowDialog() | Out-Null
 } else {
