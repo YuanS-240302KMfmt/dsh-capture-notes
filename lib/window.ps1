@@ -49,6 +49,7 @@ $script:fileResultFile = Join-Path $script:nativeDir 'file.json'
 $script:fileInput = ''
 $script:fileProcessing = $false
 $script:fileOutDir = ''
+$script:fileThumbPath = Join-Path $script:dataDir 'file-thumb.jpg'
 $script:fileSubtitleModes = @('soft', 'burn', 'both', 'none')
 $script:fileSubtitleLabels = @('软字幕', '硬字幕', '软+硬', '仅字幕')
 $script:fileSubtitleIndex = 0
@@ -900,7 +901,10 @@ $xaml = @'
           <Ellipse x:Name="StatusDot" Width="7" Height="7" Fill="#5B6B8C" Margin="0,0,8,0" VerticalAlignment="Center"/>
           <TextBlock x:Name="StatusText" Text="等待开始" Foreground="#8FA6C8" FontSize="12"/>
         </StackPanel>
-        <TextBlock x:Name="ElapsedText" Text="00:00" HorizontalAlignment="Right" Foreground="#5B6B8C" FontSize="12"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="OpenOutputButton" Content="打开输出" Background="#222B3A" Foreground="#C9D6EA" BorderThickness="0" Padding="8,2" Margin="0,0,10,0" FontSize="11" Cursor="Hand" Visibility="Collapsed" ToolTip="打开当前会话或文件输出目录"/>
+          <TextBlock x:Name="ElapsedText" Text="00:00" Foreground="#5B6B8C" FontSize="12"/>
+        </StackPanel>
       </Grid>
 
       <Border x:Name="ErrorBar" Grid.Row="6" Background="#3A1D22" Padding="16,6" Visibility="Collapsed">
@@ -938,6 +942,7 @@ $script:subtitlePanel = $window.FindName('SubtitlePanel')
 $script:statusDot = $window.FindName('StatusDot')
 $script:statusText = $window.FindName('StatusText')
 $script:elapsedText = $window.FindName('ElapsedText')
+$script:openOutputButton = $window.FindName('OpenOutputButton')
 $script:errorBar = $window.FindName('ErrorBar')
 $script:errorText = $window.FindName('ErrorText')
 $script:micSettingsButton = $window.FindName('MicSettingsButton')
@@ -1024,6 +1029,26 @@ function Get-ModeLabel {
 
 function Update-ModeHint {
   $script:modeHint.Text = (Get-ModeLabel) + ' · ' + $script:sourceLabels[$script:sourceIndex] + ' → ' + $script:targetLabels[$script:targetIndex]
+}
+
+function Open-OutputFolder {
+  if ($script:mode -eq 'file') {
+    $target = $script:fileOutDir
+    if ([string]::IsNullOrWhiteSpace($target)) { $target = Join-Path $script:moduleRoot 'out' }
+  } else {
+    $target = if ([string]::IsNullOrWhiteSpace($script:lastSessionId)) {
+      Join-Path $script:moduleRoot 'sessions'
+    } else {
+      Join-Path (Join-Path $script:moduleRoot 'sessions') $script:lastSessionId
+    }
+  }
+  if (-not (Test-Path -LiteralPath $target)) {
+    Show-Error ('找不到输出目录：' + $target)
+    return
+  }
+  try { Start-Process explorer.exe -ArgumentList $target } catch {
+    Show-Error ('无法打开输出目录：' + $_.Exception.Message)
+  }
 }
 
 function Set-FileUi([bool]$on) {
@@ -1138,6 +1163,80 @@ function Show-FileHint {
   $script:lastSignature = 'file'
 }
 
+function Show-FilePreview {
+  if ([string]::IsNullOrWhiteSpace($script:fileInput) -or -not (Test-Path -LiteralPath $script:fileInput)) {
+    Show-FileHint
+    return
+  }
+  $panel = $script:subtitlePanel
+  $panel.Children.Clear()
+  $name = [System.IO.Path]::GetFileName($script:fileInput)
+  $ext = [System.IO.Path]::GetExtension($script:fileInput).ToLowerInvariant()
+  $isAudio = $ext -in @('.mp3', '.wav', '.m4a', '.flac')
+  $ffmpeg = $script:ffmpegPath
+  if ([string]::IsNullOrWhiteSpace($ffmpeg) -or -not (Test-Path -LiteralPath $ffmpeg)) {
+    $candidate = Join-Path $script:moduleRoot 'runtime\node_modules\@ffmpeg-installer\win32-x64\ffmpeg.exe'
+    if (Test-Path -LiteralPath $candidate) { $ffmpeg = $candidate }
+  }
+  try {
+    if (-not $isAudio -and -not [string]::IsNullOrWhiteSpace($ffmpeg) -and (Test-Path -LiteralPath $ffmpeg)) {
+      Remove-Item -LiteralPath $script:fileThumbPath -Force -ErrorAction SilentlyContinue
+      $args = @('-hide_banner', '-loglevel', 'error', '-ss', '1', '-i', $script:fileInput,
+        '-frames:v', '1', '-vf', 'scale=640:-2', '-y', $script:fileThumbPath)
+      Start-Process -FilePath $ffmpeg -ArgumentList $args -Wait -WindowStyle Hidden | Out-Null
+      if (-not (Test-Path -LiteralPath $script:fileThumbPath)) {
+        Start-Process -FilePath $ffmpeg -ArgumentList @('-hide_banner', '-loglevel', 'error', '-i', $script:fileInput,
+          '-frames:v', '1', '-vf', 'scale=640:-2', '-y', $script:fileThumbPath) -Wait -WindowStyle Hidden | Out-Null
+      }
+    }
+  } catch {}
+
+  if (-not $isAudio -and (Test-Path -LiteralPath $script:fileThumbPath)) {
+    try {
+      $bitmap = [System.Windows.Media.Imaging.BitmapImage]::new()
+      $bitmap.BeginInit()
+      $bitmap.CacheOption = [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad
+      $bitmap.UriSource = [Uri]::new((Resolve-Path -LiteralPath $script:fileThumbPath).Path)
+      $bitmap.EndInit()
+      $bitmap.Freeze()
+      $image = [System.Windows.Controls.Image]::new()
+      $image.Source = $bitmap
+      $image.Stretch = 'Uniform'
+      $image.MaxHeight = 260
+      $image.MaxWidth = 520
+      $image.HorizontalAlignment = 'Center'
+      $image.Margin = [System.Windows.Thickness]::new(0, 10, 0, 8)
+      [void]$panel.Children.Add($image)
+    } catch {}
+  } else {
+    $placeholder = [System.Windows.Controls.TextBlock]::new()
+    $placeholder.Text = $(if ($isAudio) { '音频文件（无视频封面）' } else { '无法生成视频封面' })
+    $placeholder.Foreground = New-Brush '#6FCF97'
+    $placeholder.FontSize = 18
+    $placeholder.HorizontalAlignment = 'Center'
+    $placeholder.Margin = [System.Windows.Thickness]::new(0, 24, 0, 8)
+    [void]$panel.Children.Add($placeholder)
+  }
+
+  $nameText = [System.Windows.Controls.TextBlock]::new()
+  $nameText.Text = $name
+  $nameText.Foreground = New-Brush '#C9D6EA'
+  $nameText.FontSize = 12.5
+  $nameText.TextWrapping = 'Wrap'
+  $nameText.HorizontalAlignment = 'Center'
+  [void]$panel.Children.Add($nameText)
+
+  $hintText = [System.Windows.Controls.TextBlock]::new()
+  $hintText.Text = '选中文件后点「开始处理」；封面取视频第 1 秒。'
+  $hintText.Foreground = New-Brush '#4E5B73'
+  $hintText.FontSize = 11.5
+  $hintText.TextWrapping = 'Wrap'
+  $hintText.HorizontalAlignment = 'Center'
+  $hintText.Margin = [System.Windows.Thickness]::new(0, 6, 0, 0)
+  [void]$panel.Children.Add($hintText)
+  $script:lastSignature = 'file-preview'
+}
+
 function Switch-Mode([string]$mode) {
   if ($script:capturing -or $script:waitingStop -or $script:fileProcessing) { return }
   $script:mode = $mode
@@ -1157,13 +1256,14 @@ function Switch-Mode([string]$mode) {
   $script:systemCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
   $script:micCheck.Visibility = $(if ($fileActive) { 'Collapsed' } else { 'Visible' })
   $script:fileOpen.Visibility = 'Collapsed'
+  $script:openOutputButton.Visibility = $(if ($liveActive) { 'Collapsed' } else { 'Visible' })
   $script:startButton.Background = New-Brush '#E5484D'
   $script:startButton.Foreground = New-Brush '#FFFFFF'
   if ($fileActive) {
     $script:startButton.Content = '● 开始处理'
     $script:subtitleCombo.SelectedIndex = $script:fileSubtitleIndex
     $script:elapsedText.Text = ''
-    Show-FileHint
+    if ([string]::IsNullOrWhiteSpace($script:fileInput)) { Show-FileHint } else { Show-FilePreview }
   } else {
     $script:elapsedText.Text = '00:00'
     $script:startButton.Content = $(if ($recordActive) { '● 录制' } else { '● 开始' })
@@ -1197,6 +1297,7 @@ function Set-FileInput([string]$path) {
   $script:fileOpen.Visibility = 'Collapsed'
   Clear-Error
   Set-Status ('已选择 · ' + [System.IO.Path]::GetFileName($path)) '#8FA6C8'
+  Show-FilePreview
 }
 
 function Select-File {
@@ -1381,6 +1482,7 @@ $script:fileOpen.Add_Click({
     try { Start-Process explorer.exe -ArgumentList $target } catch {}
   }
 })
+$script:openOutputButton.Add_Click({ Open-OutputFolder })
 $script:monitorCombo.Add_SelectionChanged({
   if ($script:comboSyncing) { return }
   if ($script:monitorCombo.SelectedIndex -ge 0) {
@@ -1608,8 +1710,16 @@ if (-not [string]::IsNullOrWhiteSpace($PreviewPath)) {
     $script:modeHint.Text = '录屏 · 日本語 → 简体中文'
   } elseif ($PreviewMode -eq 'file') {
     Switch-Mode 'file'
-    $script:fileInput = 'D:\videos\sample.mp4'
-    $script:fileButton.Content = 'sample.mp4'
+    $previewFile = [string]$env:CAPTURE_NOTES_PREVIEW_FILE
+    if (-not [string]::IsNullOrWhiteSpace($previewFile) -and (Test-Path -LiteralPath $previewFile)) {
+      $script:fileInput = $previewFile
+      $script:fileButton.Content = Format-FileName ([System.IO.Path]::GetFileName($previewFile))
+      Show-FilePreview
+    } else {
+      $script:fileInput = 'D:\videos\sample.mp4'
+      $script:fileButton.Content = 'sample.mp4'
+      Show-FileHint
+    }
     $script:fileProcessing = $true
     Set-FileUi $true
     Set-Status '识别中 · 62%' '#F2C94C'

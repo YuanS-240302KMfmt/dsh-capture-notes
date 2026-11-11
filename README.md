@@ -23,6 +23,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | **P5 打包与独立性** | ✅ 本地安装自带模型/运行时、profile 接入、`selfContained` 与空参考目录验证；GitHub clone 不含这两块（见「从源码运行」） |
 | **0.7.0 稳定性/格式/托盘** | ✅ 已发布；长录屏/后处理退出留 0.8.0 |
 | **0.7.1 下拉框与拖拽** | ✅ 语言/字幕形态/显示器改为下拉框；文件 tab 支持拖入文件 |
+| **0.7.2 文件封面/打开输出** | ✅ 文件选中后显示视频封面；录屏/文件 tab 增加打开输出目录 |
 
 测试（全部通过）：
 
@@ -162,6 +163,7 @@ pwsh -File scripts\install-skill.ps1
 - 本次重启结果：[`docs/capture-notes-restart-report.md`](docs/capture-notes-restart-report.md)（Host 实时/文件/录屏+后处理、双音轨、文件三形态与译文烧录已通过）。
 - 0.7.0 需求：[`docs/capture-notes-v0.7.0-requirements.md`](docs/capture-notes-v0.7.0-requirements.md)；实施记录：[`docs/capture-notes-v0.7.0-report.md`](docs/capture-notes-v0.7.0-report.md)。
 - 0.7.1 改动：[`docs/capture-notes-v0.7.1-report.md`](docs/capture-notes-v0.7.1-report.md)。
+- 0.7.2 改动：[`docs/capture-notes-v0.7.2-report.md`](docs/capture-notes-v0.7.2-report.md)。
 - `models\`、`runtime\` 已在 `.gitignore`；npm `files` 不包含它们，当前是本地 link 安装，不是 npm 发布包。
 
 ## 运行与自检

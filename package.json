@@ -1,6 +1,6 @@
 {
   "name": "dsh-capture-notes",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "Windows capture studio for DSH: live subtitles, screen recording, file transcription and notes.",
   "license": "Apache-2.0",
