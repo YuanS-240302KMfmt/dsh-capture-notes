@@ -1083,8 +1083,32 @@ function Open-OutputFolder {
   }
 }
 
+function Find-FileOutputForInput([string]$inputPath) {
+  if ([string]::IsNullOrWhiteSpace($inputPath)) { return '' }
+  $root = Join-Path $script:moduleRoot 'out'
+  try {
+    foreach ($dir in Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending) {
+      $manifestPath = Join-Path $dir.FullName 'session.json'
+      if (-not (Test-Path -LiteralPath $manifestPath)) { continue }
+      try { $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json } catch { continue }
+      if ([string]$manifest.input.path -ne $inputPath) { continue }
+      if (-not (Test-Path -LiteralPath (Join-Path $dir.FullName 'transcript.md'))) { continue }
+      return $dir.FullName
+    }
+  } catch {}
+  return ''
+}
+
 function Get-SummaryDir {
   if ($script:mode -eq 'file') {
+    if ([string]::IsNullOrWhiteSpace($script:fileOutDir) -and -not [string]::IsNullOrWhiteSpace($script:fileInput)) {
+      $found = Find-FileOutputForInput $script:fileInput
+      if (-not [string]::IsNullOrWhiteSpace($found)) {
+        $script:fileOutDir = $found
+        $script:fileOpen.Visibility = 'Visible'
+        $script:fileOpen.Tag = $found
+      }
+    }
     if (-not [string]::IsNullOrWhiteSpace($script:fileOutDir) -and (Test-Path -LiteralPath (Join-Path $script:fileOutDir 'transcript.md'))) {
       return $script:fileOutDir
     }
@@ -1516,6 +1540,7 @@ function Update-FileState {
     $percent = 0
     [void][int]::TryParse([string]$state.percent, [ref]$percent)
     Set-Status (([string]$state.stage) + ' · ' + $percent + '%') '#F2C94C'
+    if ([string]$state.stage -eq 'done' -and $percent -ge 100) { Update-SummaryButton }
     return
   }
   $script:fileProcessing = $false
