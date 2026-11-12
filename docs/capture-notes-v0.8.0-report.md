@@ -33,14 +33,20 @@
 ## 真实测试记录
 
 - 2026-11-12 首次真实点击：`cannot get property "agentDefaultModel" without inject`；
-- 已给插件补 `inject = ['connection', 'agentDefaultModel']`，并优先用 `ctx.get('agentDefaultModel')` 读取；需重启 DSH 复测。
+- 已给插件补 `inject = ['connection', 'agentDefaultModel']`，并优先用 `ctx.get('agentDefaultModel')` 读取；
+- 文件 tab 重新选中已完成输出后，按钮恢复正常（Host 收尾前重启时从 `out` 反查 `fileOutDir`）；
+- 真实模型验收 PASS：
+  - provider/model：`deepseek-official` / `deepseek-flash`，reasoning `high`；
+  - 输入：65 段、334.6 秒的会议文件；
+  - 输出：`notes.md` 3363 B，15.9 秒，1 个分段；
+  - manifest：`artifacts.notes = notes.md`，`summary.model` 与 `summary.chunks` 已写入。
 
 ## 待验收
 
-- 真实 DSH 模型调用（mock 只验证协议和流水线）；
-- 录屏/文件完成后的按钮可见性；
-- 长文件分段合并；
-- 隐私确认与取消。
+- 录屏完成后的「生成纪要」按钮（文件模式已验收）；
+- 长逐字稿 >18k 字符时的分段合并；
+- 取消纪要；
+- 长录屏、后处理中退出仍待补。
 
 ## 说明
 
