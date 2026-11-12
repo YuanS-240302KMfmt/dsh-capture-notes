@@ -30,6 +30,11 @@
 - `node tests/window-e2e.mjs`：PASS；
 - `node tests/file-window-e2e.mjs`：PASS。
 
+## 真实测试记录
+
+- 2026-11-12 首次真实点击：`cannot get property "agentDefaultModel" without inject`；
+- 已给插件补 `inject = ['connection', 'agentDefaultModel']`，并优先用 `ctx.get('agentDefaultModel')` 读取；需重启 DSH 复测。
+
 ## 待验收
 
 - 真实 DSH 模型调用（mock 只验证协议和流水线）；

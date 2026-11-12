@@ -1188,6 +1188,7 @@ function Update-SummaryState {
     Set-Status '已取消纪要' '#8FA6C8'
   } else {
     $script:summaryText.Text = '生成失败：' + [string]$state.error
+    Set-Status '纪要生成失败' '#EB5757'
     Show-Error ('内容纪要生成失败：' + [string]$state.error)
   }
 }
