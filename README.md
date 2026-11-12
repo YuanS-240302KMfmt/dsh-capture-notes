@@ -25,6 +25,7 @@ Windows 桌面小窗模块：**实时 / 录屏 / 文件**三种模式共用一�
 | **0.7.1 下拉框与拖拽** | ✅ 语言/字幕形态/显示器改为下拉框；文件 tab 支持拖入文件 |
 | **0.7.2 文件封面/打开输出** | ✅ 文件选中后显示视频封面；录屏/文件 tab 增加打开输出目录 |
 | **0.8.0 内容纪要** | ✅ 录屏/文件完成后用当前 DSH 模型生成 notes.md；长录屏/后处理退出待补 |
+| **0.8.1 长文件纪要** | ✅ 43,733 字符 / 3 段合并，检测截断并压缩重试 |
 
 测试（全部通过）：
 
@@ -167,6 +168,7 @@ pwsh -File scripts\install-skill.ps1
 - 0.7.1 改动：[`docs/capture-notes-v0.7.1-report.md`](docs/capture-notes-v0.7.1-report.md)。
 - 0.7.2 改动：[`docs/capture-notes-v0.7.2-report.md`](docs/capture-notes-v0.7.2-report.md)。
 - 0.8.0 需求：[`docs/capture-notes-v0.8.0-requirements.md`](docs/capture-notes-v0.8.0-requirements.md)；实施记录：[`docs/capture-notes-v0.8.0-report.md`](docs/capture-notes-v0.8.0-report.md)。
+- 0.8.1 长文件修复：[`docs/capture-notes-v0.8.1-report.md`](docs/capture-notes-v0.8.1-report.md)。
 - `models\`、`runtime\` 已在 `.gitignore`；npm `files` 不包含它们，当前是本地 link 安装，不是 npm 发布包。
 
 ## 运行与自检
